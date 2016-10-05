@@ -48,6 +48,8 @@ typedef struct {
     unsigned                 is_link:1;
     unsigned                 is_exec:1;
     unsigned                 is_directio:1;
+
+    unsigned                 is_created:1;
 } ngx_open_file_info_t;
 
 

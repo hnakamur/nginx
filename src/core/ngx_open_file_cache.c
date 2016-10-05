@@ -155,6 +155,7 @@ ngx_open_cached_file(ngx_open_file_cache_t *cache, ngx_str_t *name,
 
     of->fd = NGX_INVALID_FILE;
     of->err = 0;
+    of->is_created = 0;
 
     if (cache == NULL) {
 
@@ -384,6 +385,7 @@ create:
     ngx_rbtree_insert(&cache->rbtree, &file->node);
 
     cache->current++;
+    of->is_created = 1;
 
     file->uses = 1;
     file->count = 0;
@@ -1063,6 +1065,10 @@ ngx_close_cached_file(ngx_open_file_cache_t *cache,
         }
 
         file->fd = NGX_INVALID_FILE;
+
+        ngx_log_error(NGX_LOG_NOTICE, log, 0,
+                      "[upstream_cache] closed_cached_open_file:%s",
+                      file->name);
     }
 
     if (!file->close) {

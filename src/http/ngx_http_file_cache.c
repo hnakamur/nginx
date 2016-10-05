@@ -394,6 +394,30 @@ done:
         return ngx_http_file_cache_lock(r, c);
     }
 
+    if (of.is_created) {
+        size_t             len;
+        ngx_str_t         *key;
+        ngx_uint_t         i;
+
+        len = 0;
+        for (i = 0; i < c->keys.nelts; i++) {
+            len += key[i].len;
+        }
+        key = ngx_alloc(len + 1, r->connection->log);
+        if (key == NULL) {
+            return rv;
+        }
+
+        len = 0;
+        for (i = 0; i < c->keys.nelts; i++) {
+            ngx_memcpy(key + len, key[i].data, key[i].len);
+            len += key[i].len;
+        }
+        ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+                      "[upstream_cache] created_file:%s key:%s", &c->file.name, key);
+        ngx_free(key);
+    }
+
     return rv;
 }
 
