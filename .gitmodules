@@ -142,3 +142,6 @@
 [submodule "nginx-sxg-module"]
 	path = nginx-sxg-module
 	url = https://github.com/google/nginx-sxg-module
+[submodule "openssl"]
+	path = openssl
+	url = https://github.com/openssl/openssl
