@@ -1518,7 +1518,7 @@ ngx_ssl_create_connection(ngx_ssl_t *ssl, ngx_connection_t *c, ngx_uint_t flags)
 
     sc->connection = SSL_new(ssl->ctx);
 
-#ifdef  BIO_get_ktls_send
+#ifdef NGX_OPENSSL_SSL_SENDFILE
     sc->ktls = 0;
 #endif
     if (sc->connection == NULL) {
@@ -1631,13 +1631,11 @@ ngx_ssl_handshake(ngx_connection_t *c)
         c->recv_chain = ngx_ssl_recv_chain;
         c->send_chain = ngx_ssl_send_chain;
 
-#if (NGX_LINUX)
-#ifdef BIO_get_ktls_send
+#ifdef NGX_OPENSSL_SSL_SENDFILE
         if (BIO_get_ktls_send(SSL_get_wbio(c->ssl->connection))) {
             c->ssl->ktls = 1;
             c->send_chain = ngx_send_chain;
         }
-#endif
 #endif
 #ifndef SSL_OP_NO_RENEGOTIATION
 #if OPENSSL_VERSION_NUMBER < 0x10100000L

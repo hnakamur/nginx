@@ -257,6 +257,7 @@ eintr:
                    "sendfile: @%O %uz", file->file_pos, size);
 
 #if (NGX_HTTP_SSL)
+#ifdef NGX_OPENSSL_SSL_SENDFILE
     if (c->ssl) {
         n = SSL_sendfile(c->ssl->connection, file->file->fd, offset, size, 0);
     } else {
@@ -264,6 +265,7 @@ eintr:
     }
 #else
     n = sendfile(c->fd, file->file->fd, &offset, size);
+#endif
 #endif
 
     if (n == -1) {
