@@ -256,7 +256,15 @@ eintr:
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
                    "sendfile: @%O %uz", file->file_pos, size);
 
+#if (NGX_HTTP_SSL)
+    if (c->ssl) {
+        n = SSL_sendfile(c->ssl->connection, file->file->fd, offset, size, 0);
+    } else {
+        n = sendfile(c->fd, file->file->fd, &offset, size);
+    }
+#else
     n = sendfile(c->fd, file->file->fd, &offset, size);
+#endif
 
     if (n == -1) {
         err = ngx_errno;

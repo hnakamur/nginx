@@ -99,6 +99,9 @@ struct ngx_ssl_connection_s {
     unsigned                    in_early:1;
     unsigned                    early_preread:1;
     unsigned                    write_blocked:1;
+#ifdef BIO_get_ktls_send
+    unsigned                    ktls:1;
+#endif
 };
 
 

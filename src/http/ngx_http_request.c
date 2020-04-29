@@ -604,9 +604,15 @@ ngx_http_alloc_request(ngx_connection_t *c)
     }
 
 #if (NGX_HTTP_SSL)
-    if (c->ssl) {
+#ifndef BIO_get_ktls_send
+    if (c->ssl){
         r->main_filter_need_in_memory = 1;
     }
+#else
+    if(c->ssl && !c->ssl->ktls){
+        r->main_filter_need_in_memory = 1;
+    }
+#endif
 #endif
 
     r->main = r;
