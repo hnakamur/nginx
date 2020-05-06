@@ -19,6 +19,10 @@ echo > $NGX_AUTOCONF_ERR
 echo "#define NGX_CONFIGURE \"$NGX_CONFIGURE\"" > $NGX_AUTO_CONFIG_H
 
 
+if [ $LIBNGINX = YES ]; then
+    have=LIBNGINX . auto/have
+fi
+
 if [ $NGX_DEBUG = YES ]; then
     have=NGX_DEBUG . auto/have
 fi
@@ -59,7 +63,9 @@ if [ "$NGX_PLATFORM" != win32 ]; then
 fi
 
 . auto/threads
+if [ $LIBNGINX != YES ]; then
 . auto/modules
+fi
 . auto/lib/conf
 
 case ".$NGX_PREFIX" in
