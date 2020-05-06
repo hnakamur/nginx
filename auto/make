@@ -222,6 +222,23 @@ ngx_main_link=${MAIN_LINK:+`echo $MAIN_LINK \
     | sed -e "s/\//$ngx_regex_dirsep/g" -e "s/^/$ngx_long_regex_cont/"`}
 
 
+# the libnginx sources
+
+if [ $LIBNGINX = YES ]; then
+
+cat << END                                                    >> $NGX_MAKEFILE
+
+build:	binary
+
+binary:	$NGX_OBJS${ngx_dirsep}libnginx.a
+
+$NGX_OBJS${ngx_dirsep}libnginx.a:	$ngx_deps$ngx_spacer
+	\$(AR) rcs \$@ \$^
+$ngx_long_end
+END
+
+else
+
 cat << END                                                    >> $NGX_MAKEFILE
 
 build:	binary modules manpage
@@ -236,6 +253,7 @@ $ngx_long_end
 modules:
 END
 
+fi
 
 # ngx_modules.c
 

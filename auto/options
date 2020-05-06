@@ -16,6 +16,7 @@ NGX_LOCK_PATH=
 NGX_USER=
 NGX_GROUP=
 NGX_BUILD=
+LIBNGINX=NO
 
 CC=${CC:-cc}
 CPP=
@@ -185,6 +186,7 @@ do
     case "$option" in
         --help)                          help=yes                   ;;
 
+        --libnginx)                      LIBNGINX=YES               ;;
         --prefix=)                       NGX_PREFIX="!"             ;;
         --prefix=*)                      NGX_PREFIX="$value"        ;;
         --sbin-path=*)                   NGX_SBIN_PATH="$value"     ;;
