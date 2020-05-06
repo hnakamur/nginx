@@ -93,6 +93,21 @@ else
     NGX_HTML=docs/html
 fi
 
+if [ $LIBNGINX = YES ]; then
+
+cat << END                                                    >> $NGX_MAKEFILE
+
+install:	build
+	test -d '\$(DESTDIR)$NGX_PREFIX/include/nginx' || mkdir -p '\$(DESTDIR)$NGX_PREFIX/include/nginx'
+	cp src/core/*.h src/event/*.h src/os/unix/*.h $NGX_OBJS/*.h '\$(DESTDIR)$NGX_PREFIX/include/nginx/'
+
+	test -d '\$(DESTDIR)$NGX_PREFIX/lib' || mkdir -p '\$(DESTDIR)$NGX_PREFIX/lib'
+	cp $NGX_OBJS/libnginx.a '\$(DESTDIR)$NGX_PREFIX/lib/'
+
+END
+
+else
+
 cat << END                                                    >> $NGX_MAKEFILE
 
 manpage:	$NGX_OBJS/nginx.8
@@ -178,6 +193,7 @@ END
 
 fi
 
+fi
 
 for ngx_module in $DYNAMIC_MODULES
 do
