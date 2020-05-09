@@ -60,6 +60,9 @@ typedef struct {
 
 
 void ngx_slab_sizes_init(void);
+#ifdef LIBNGINX
+int ngx_slab_init_size(ngx_slab_pool_t *pool, size_t pool_size);
+#endif
 void ngx_slab_init(ngx_slab_pool_t *pool);
 void *ngx_slab_alloc(ngx_slab_pool_t *pool, size_t size);
 void *ngx_slab_alloc_locked(ngx_slab_pool_t *pool, size_t size);
