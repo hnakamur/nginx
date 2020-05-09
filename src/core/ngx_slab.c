@@ -97,7 +97,7 @@ ngx_slab_sizes_init(void)
 
 #ifdef LIBNGINX
 int
-ngx_slab_init_size(ngx_slab_pool_t *pool, size_t pool_size)
+libnginx_slab_init_size(ngx_slab_pool_t *pool, size_t pool_size)
 {
     pool->end = (u_char *) pool + pool_size;
     pool->min_shift = 3;
