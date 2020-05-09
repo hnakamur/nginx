@@ -46,9 +46,11 @@ ngx_os_init(ngx_log_t *log)
     }
 #endif
 
+#ifndef LIBNGINX
     if (ngx_init_setproctitle(log) != NGX_OK) {
         return NGX_ERROR;
     }
+#endif
 
     ngx_pagesize = getpagesize();
     ngx_cacheline_size = NGX_CPU_CACHE_LINE;
