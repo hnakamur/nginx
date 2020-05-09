@@ -43,6 +43,12 @@ CORE_DEPS="src/core/nginx.h \
            src/core/ngx_proxy_protocol.h \
            src/core/ngx_syslog.h"
 
+if [ $LIBNGINX = YES ]; then
+
+CORE_DEPS="$CORE_DEPS \
+           src/core/libnginx.h"
+
+fi
 
 CORE_SRCS="src/core/nginx.c \
            src/core/ngx_log.c \
@@ -80,6 +86,11 @@ CORE_SRCS="src/core/nginx.c \
            src/core/ngx_proxy_protocol.c \
            src/core/ngx_syslog.c"
 
+if [ $LIBNGINX = YES ]; then
+
+CORE_SRCS=$(echo "$CORE_SRCS" | sed 's|src/core/nginx\.c|src/core/libnginx.c|')
+
+fi
 
 EVENT_MODULES="ngx_events_module ngx_event_core_module"
 
