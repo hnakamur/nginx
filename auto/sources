@@ -7,6 +7,77 @@ CORE_MODULES="ngx_core_module ngx_errlog_module ngx_conf_module"
 
 CORE_INCS="src/core"
 
+if [ $LIBNGINX = YES ]; then
+
+CORE_DEPS="src/core/libnginx.h \
+           src/core/nginx.h \
+           src/core/ngx_config.h \
+           src/core/ngx_core.h \
+           src/core/ngx_log.h \
+           src/core/ngx_palloc.h \
+           src/core/ngx_array.h \
+           src/core/ngx_list.h \
+           src/core/ngx_hash.h \
+           src/core/ngx_buf.h \
+           src/core/ngx_queue.h \
+           src/core/ngx_string.h \
+           src/core/ngx_parse.h \
+           src/core/ngx_parse_time.h \
+           src/core/ngx_inet.h \
+           src/core/ngx_file.h \
+           src/core/ngx_crc.h \
+           src/core/ngx_crc32.h \
+           src/core/ngx_murmurhash.h \
+           src/core/ngx_md5.h \
+           src/core/ngx_sha1.h \
+           src/core/ngx_rbtree.h \
+           src/core/ngx_radix_tree.h \
+           src/core/ngx_rwlock.h \
+           src/core/ngx_slab.h \
+           src/core/ngx_times.h \
+           src/core/ngx_shmtx.h \
+           src/core/ngx_cycle.h \
+           src/core/ngx_conf_file.h \
+           src/core/ngx_module.h \
+           src/core/ngx_resolver.h \
+           src/core/ngx_open_file_cache.h \
+           src/core/ngx_crypt.h \
+           src/core/ngx_proxy_protocol.h \
+           src/core/ngx_syslog.h"
+
+CORE_SRCS="src/core/libnginx.c \
+           src/core/ngx_log.c \
+           src/core/ngx_palloc.c \
+           src/core/ngx_array.c \
+           src/core/ngx_list.c \
+           src/core/ngx_hash.c \
+           src/core/ngx_buf.c \
+           src/core/ngx_queue.c \
+           src/core/ngx_string.c \
+           src/core/ngx_parse.c \
+           src/core/ngx_parse_time.c \
+           src/core/ngx_inet.c \
+           src/core/ngx_file.c \
+           src/core/ngx_crc32.c \
+           src/core/ngx_murmurhash.c \
+           src/core/ngx_md5.c \
+           src/core/ngx_sha1.c \
+           src/core/ngx_rbtree.c \
+           src/core/ngx_radix_tree.c \
+           src/core/ngx_slab.c \
+           src/core/ngx_times.c \
+           src/core/ngx_shmtx.c \
+           src/core/ngx_spinlock.c \
+           src/core/ngx_rwlock.c \
+           src/core/ngx_cpuinfo.c \
+           src/core/ngx_conf_file.c \
+           src/core/ngx_module.c \
+           src/core/ngx_crypt.c \
+           src/core/ngx_proxy_protocol.c"
+
+
+else
+
 CORE_DEPS="src/core/nginx.h \
            src/core/ngx_config.h \
            src/core/ngx_core.h \
@@ -42,13 +113,6 @@ CORE_DEPS="src/core/nginx.h \
            src/core/ngx_crypt.h \
            src/core/ngx_proxy_protocol.h \
            src/core/ngx_syslog.h"
-
-if [ $LIBNGINX = YES ]; then
-
-CORE_DEPS="$CORE_DEPS \
-           src/core/libnginx.h"
-
-fi
 
 CORE_SRCS="src/core/nginx.c \
            src/core/ngx_log.c \
@@ -86,11 +150,7 @@ CORE_SRCS="src/core/nginx.c \
            src/core/ngx_proxy_protocol.c \
            src/core/ngx_syslog.c"
 
-if [ $LIBNGINX = YES ]; then
-
-CORE_SRCS=$(echo "$CORE_SRCS" | sed 's|src/core/nginx\.c|src/core/libnginx.c|')
-
-fi
+fi # $LIBNGINX = YES
 
 EVENT_MODULES="ngx_events_module ngx_event_core_module"
 
@@ -128,14 +188,62 @@ DEVPOLL_SRCS=src/event/modules/ngx_devpoll_module.c
 EVENTPORT_MODULE=ngx_eventport_module
 EVENTPORT_SRCS=src/event/modules/ngx_eventport_module.c
 
+if [ $LIBNGINX = YES ]; then
+
+EPOLL_MODULE=
+EPOLL_SRCS=
+
+else
+
 EPOLL_MODULE=ngx_epoll_module
 EPOLL_SRCS=src/event/modules/ngx_epoll_module.c
+
+fi # $LIBNGINX = YES
 
 IOCP_MODULE=ngx_iocp_module
 IOCP_SRCS=src/event/modules/ngx_iocp_module.c
 
 FILE_AIO_SRCS="src/os/unix/ngx_file_aio_read.c"
 LINUX_AIO_SRCS="src/os/unix/ngx_linux_aio_read.c"
+
+
+if [ $LIBNGINX = YES ]; then
+
+UNIX_INCS="$CORE_INCS src/os/unix"
+
+UNIX_DEPS="$CORE_DEPS \
+            src/os/unix/ngx_time.h \
+            src/os/unix/ngx_errno.h \
+            src/os/unix/ngx_alloc.h \
+            src/os/unix/ngx_files.h \
+            src/os/unix/ngx_channel.h \
+            src/os/unix/ngx_shmem.h \
+            src/os/unix/ngx_process.h \
+            src/os/unix/ngx_setaffinity.h \
+            src/os/unix/ngx_setproctitle.h \
+            src/os/unix/ngx_atomic.h \
+            src/os/unix/ngx_gcc_atomic_x86.h \
+            src/os/unix/ngx_thread.h \
+            src/os/unix/ngx_socket.h \
+            src/os/unix/ngx_os.h \
+            src/os/unix/ngx_user.h \
+            src/os/unix/ngx_dlopen.h"
+
+UNIX_SRCS="$CORE_SRCS \
+            src/os/unix/ngx_time.c \
+            src/os/unix/ngx_errno.c \
+            src/os/unix/ngx_alloc.c \
+            src/os/unix/ngx_files.c \
+            src/os/unix/ngx_socket.c \
+            src/os/unix/ngx_shmem.c \
+            src/os/unix/ngx_daemon.c \
+            src/os/unix/ngx_setaffinity.c \
+            src/os/unix/ngx_setproctitle.c \
+            src/os/unix/ngx_posix_init.c \
+            src/os/unix/ngx_user.c \
+            src/os/unix/ngx_dlopen.c"
+
+else
 
 UNIX_INCS="$CORE_INCS $EVENT_INCS src/os/unix"
 
@@ -192,6 +300,8 @@ UNIX_SRCS="$CORE_SRCS $EVENT_SRCS \
             src/os/unix/ngx_dlopen.c \
             src/os/unix/ngx_process_cycle.c"
 
+fi # $LIBNGINX = YES
+
 POSIX_DEPS=src/os/unix/ngx_posix_config.h
 
 THREAD_POOL_MODULE=ngx_thread_pool_module
@@ -207,8 +317,16 @@ FREEBSD_SENDFILE_SRCS=src/os/unix/ngx_freebsd_sendfile_chain.c
 
 LINUX_DEPS="src/os/unix/ngx_linux_config.h src/os/unix/ngx_linux.h"
 LINUX_SRCS=src/os/unix/ngx_linux_init.c
+
+if [ $LIBNGINX = YES ]; then
+
+LINUX_SENDFILE_SRCS=
+
+else
+
 LINUX_SENDFILE_SRCS=src/os/unix/ngx_linux_sendfile_chain.c
 
+fi # $LIBNGINX = YES
 
 SOLARIS_DEPS="src/os/unix/ngx_solaris_config.h src/os/unix/ngx_solaris.h"
 SOLARIS_SRCS=src/os/unix/ngx_solaris_init.c

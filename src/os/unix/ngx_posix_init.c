@@ -18,6 +18,7 @@ ngx_uint_t  ngx_tcp_nodelay_and_tcp_nopush;
 
 struct rlimit  rlmt;
 
+#ifndef LIBNGINX
 
 ngx_os_io_t ngx_os_io = {
     ngx_unix_recv,
@@ -30,6 +31,7 @@ ngx_os_io_t ngx_os_io = {
     0
 };
 
+#endif
 
 ngx_int_t
 ngx_os_init(ngx_log_t *log)

@@ -10,6 +10,15 @@
 
 #ifdef LIBNGINX
 
+/* Copied from src/core/ngx_cycle.c */
+volatile ngx_cycle_t  *ngx_cycle;
+
+/* Copied from src/os/unix/ngx_process_cycle.c */
+ngx_pid_t     ngx_pid;
+ngx_pid_t     ngx_parent;
+
+ngx_int_t     libnginx_debug_points = NGX_DEBUG_POINTS_STOP;
+
 int libnginx_init(const char *log_filename, unsigned log_level, ngx_uint_t use_stderr)
 {
     ngx_debug_init();
@@ -54,4 +63,18 @@ libnginx_slab_init_size(ngx_slab_pool_t *pool, size_t pool_size)
     return NGX_OK;
 }
 
+/* ngx_debug_point copied from src/os/unix/ngx_process.c and modified. */
+void
+ngx_debug_point(void)
+{
+    switch (libnginx_debug_points) {
+
+    case NGX_DEBUG_POINTS_STOP:
+        raise(SIGSTOP);
+        break;
+
+    case NGX_DEBUG_POINTS_ABORT:
+        ngx_abort();
+    }
+}
 #endif

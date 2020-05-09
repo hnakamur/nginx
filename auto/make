@@ -191,8 +191,15 @@ ngx_all_objs=`echo $ngx_all_srcs \
 
 ngx_modules_c=`echo $NGX_MODULES_C | sed -e "s/\//$ngx_regex_dirsep/g"`
 
+if [ $LIBNGINX = YES ]; then
+
+ngx_modules_obj=
+
+else
+
 ngx_modules_obj=`echo $ngx_modules_c | sed -e "s/\(.*\.\)c/\1$ngx_objext/"`
 
+fi # $LIBNGINX = YES
 
 if test -n "$NGX_RES"; then
    ngx_res=$NGX_RES
@@ -263,6 +270,8 @@ else
     ngx_cc="\$(CC) $ngx_compile_opt \$(CFLAGS) \$(CORE_INCS)"
 fi
 
+if [ $LIBNGINX != YES ]; then
+
 cat << END                                                    >> $NGX_MAKEFILE
 
 $ngx_modules_obj:	\$(CORE_DEPS)$ngx_cont$ngx_modules_c
@@ -270,6 +279,7 @@ $ngx_modules_obj:	\$(CORE_DEPS)$ngx_cont$ngx_modules_c
 
 END
 
+fi # $LIBNGINX != YES
 
 # the core sources
 
