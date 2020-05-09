@@ -95,22 +95,6 @@ ngx_slab_sizes_init(void)
 }
 
 
-#ifdef LIBNGINX
-int
-libnginx_slab_init_size(ngx_slab_pool_t *pool, size_t pool_size)
-{
-    pool->end = (u_char *) pool + pool_size;
-    pool->min_shift = 3;
-    pool->addr = pool;
-    if (ngx_shmtx_create(&pool->mutex, &pool->lock, NULL) != NGX_OK) {
-        return NGX_ERROR;
-    }
-    ngx_slab_init(pool);
-    return NGX_OK;
-}
-#endif
-
-
 void
 ngx_slab_init(ngx_slab_pool_t *pool)
 {

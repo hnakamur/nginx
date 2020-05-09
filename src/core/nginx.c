@@ -10,16 +10,12 @@
 #include <nginx.h>
 
 
-#ifndef LIBNGINX
 static void ngx_show_version_info(void);
 static ngx_int_t ngx_add_inherited_sockets(ngx_cycle_t *cycle);
-#endif /* LIBNGINX */
 static void ngx_cleanup_environment(void *data);
-#ifndef LIBNGINX
 static ngx_int_t ngx_get_options(int argc, char *const *argv);
 static ngx_int_t ngx_process_options(ngx_cycle_t *cycle);
 static ngx_int_t ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv);
-#endif /* LIBNGINX */
 static void *ngx_core_module_create_conf(ngx_cycle_t *cycle);
 static char *ngx_core_module_init_conf(ngx_cycle_t *cycle, void *conf);
 static char *ngx_set_user(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
@@ -183,7 +179,6 @@ ngx_module_t  ngx_core_module = {
 };
 
 
-#ifndef LIBNGINX
 static ngx_uint_t   ngx_show_help;
 static ngx_uint_t   ngx_show_version;
 static ngx_uint_t   ngx_show_configure;
@@ -192,45 +187,10 @@ static u_char      *ngx_error_log;
 static u_char      *ngx_conf_file;
 static u_char      *ngx_conf_params;
 static char        *ngx_signal;
-#endif /* LIBNGINX */
 
 
 static char **ngx_os_environ;
 
-
-#ifdef LIBNGINX
-
-int libnginx_init(const char *log_filename, unsigned log_level, ngx_uint_t use_stderr)
-{
-    ngx_debug_init();
-    int ret = ngx_strerror_init();
-    if (ret != NGX_OK) {
-        return ret;
-    }
-    ngx_time_init();
-
-    ngx_pid = ngx_getpid();
-    ngx_parent = ngx_getppid();
-
-    ngx_log_t *log = ngx_log_init_name((u_char *) log_filename);
-    log->log_level = log_level;
-    ngx_use_stderr = use_stderr;
-
-    ngx_cycle_t init_cycle;
-    ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
-    init_cycle.log = log;
-    ngx_cycle = &init_cycle;
-
-    ret = ngx_os_init(log);
-    if (ret != NGX_OK) {
-        return ret;
-    }
-    ngx_slab_sizes_init();
-
-    return NGX_OK;
-}
-
-#else
 
 int ngx_cdecl
 main(int argc, char *const *argv)
@@ -553,7 +513,6 @@ ngx_add_inherited_sockets(ngx_cycle_t *cycle)
 
     return ngx_set_inherited_sockets(cycle);
 }
-#endif /* LIBNGINX */
 
 
 char **
@@ -787,7 +746,6 @@ ngx_exec_new_binary(ngx_cycle_t *cycle, char *const *argv)
 }
 
 
-#ifndef LIBNGINX
 static ngx_int_t
 ngx_get_options(int argc, char *const *argv)
 {
@@ -1078,7 +1036,6 @@ ngx_process_options(ngx_cycle_t *cycle)
 
     return NGX_OK;
 }
-#endif /* LIBNGINX */
 
 
 static void *
