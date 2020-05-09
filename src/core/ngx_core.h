@@ -111,7 +111,7 @@ void ngx_cpuinfo(void);
 #endif
 
 #ifdef LIBNGINX
-int libnginx_init(ngx_log_t **log, const char *log_filename, unsigned log_level, ngx_uint_t use_stderr);
+int libnginx_init(const char *log_filename, unsigned log_level, ngx_uint_t use_stderr);
 #endif
 
 #endif /* _NGX_CORE_H_INCLUDED_ */

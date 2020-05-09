@@ -200,7 +200,7 @@ static char **ngx_os_environ;
 
 #ifdef LIBNGINX
 
-int libnginx_init(ngx_log_t **log, const char *log_filename, unsigned log_level, ngx_uint_t use_stderr)
+int libnginx_init(const char *log_filename, unsigned log_level, ngx_uint_t use_stderr)
 {
     ngx_debug_init();
     int ret = ngx_strerror_init();
@@ -212,16 +212,16 @@ int libnginx_init(ngx_log_t **log, const char *log_filename, unsigned log_level,
     ngx_pid = ngx_getpid();
     ngx_parent = ngx_getppid();
 
-    ngx_log_t *l = *log = ngx_log_init_name((u_char *) log_filename);
-    l->log_level = log_level;
+    ngx_log_t *log = ngx_log_init_name((u_char *) log_filename);
+    log->log_level = log_level;
     ngx_use_stderr = use_stderr;
 
     ngx_cycle_t init_cycle;
     ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
-    init_cycle.log = l;
+    init_cycle.log = log;
     ngx_cycle = &init_cycle;
 
-    ret = ngx_os_init(l);
+    ret = ngx_os_init(log);
     if (ret != NGX_OK) {
         return ret;
     }
