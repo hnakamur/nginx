@@ -110,4 +110,8 @@ void ngx_cpuinfo(void);
 #define NGX_DISABLE_SYMLINKS_NOTOWNER   2
 #endif
 
+#ifdef LIBNGINX
+int libnginx_init(ngx_log_t **log, const char *log_filename, unsigned log_level, ngx_uint_t use_stderr);
+#endif
+
 #endif /* _NGX_CORE_H_INCLUDED_ */
