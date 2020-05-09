@@ -228,6 +228,9 @@ void ngx_cdecl ngx_log_debug_core(ngx_log_t *log, ngx_err_t err,
 
 /*********************************/
 
+#ifdef LIBNGINX
+ngx_log_t *ngx_log_init_name(u_char *name);
+#endif /* LIBNGINX */
 ngx_log_t *ngx_log_init(u_char *prefix, u_char *error_log);
 void ngx_cdecl ngx_log_abort(ngx_err_t err, const char *fmt, ...);
 void ngx_cdecl ngx_log_stderr(ngx_err_t err, const char *fmt, ...);
