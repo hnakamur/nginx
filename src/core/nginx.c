@@ -932,14 +932,9 @@ ngx_get_options(int argc, char *const *argv)
 
     return NGX_OK;
 }
-#endif /* LIBNGINX */
 
 
-#ifdef LIBNGINX
-ngx_int_t
-#else
 static ngx_int_t
-#endif /* LIBNGINX */
 ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv)
 {
 #if (NGX_FREEBSD)
@@ -981,7 +976,6 @@ ngx_save_argv(ngx_cycle_t *cycle, int argc, char *const *argv)
 }
 
 
-#ifndef LIBNGINX
 static ngx_int_t
 ngx_process_options(ngx_cycle_t *cycle)
 {
