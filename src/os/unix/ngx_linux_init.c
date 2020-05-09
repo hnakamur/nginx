@@ -12,6 +12,7 @@
 u_char  ngx_linux_kern_ostype[50];
 u_char  ngx_linux_kern_osrelease[50];
 
+#ifndef LIBNGINX
 
 static ngx_os_io_t ngx_linux_io = {
     ngx_unix_recv,
@@ -29,6 +30,7 @@ static ngx_os_io_t ngx_linux_io = {
 #endif
 };
 
+#endif
 
 ngx_int_t
 ngx_os_specific_init(ngx_log_t *log)
@@ -46,7 +48,9 @@ ngx_os_specific_init(ngx_log_t *log)
     (void) ngx_cpystrn(ngx_linux_kern_osrelease, (u_char *) u.release,
                        sizeof(ngx_linux_kern_osrelease));
 
+#ifndef LIBNGINX
     ngx_os_io = ngx_linux_io;
+#endif
 
     return NGX_OK;
 }

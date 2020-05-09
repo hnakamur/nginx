@@ -14,6 +14,8 @@
 
 #ifdef LIBNGINX
 
+extern ngx_int_t     libnginx_debug_points;
+
 int libnginx_init(const char *log_filename, unsigned log_level, ngx_uint_t use_stderr);
 int libnginx_slab_init_size(ngx_slab_pool_t *pool, size_t pool_size);
 

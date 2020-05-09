@@ -595,7 +595,9 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 {
     ngx_log_t          *new_log;
     ngx_str_t          *value, name;
+#ifndef LIBNGINX
     ngx_syslog_peer_t  *peer;
+#endif
 
     if (*head != NULL && (*head)->log_level == 0) {
         new_log = *head;
@@ -682,6 +684,8 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
         return NGX_CONF_ERROR;
 #endif
 
+#ifndef LIBNGINX
+
     } else if (ngx_strncmp(value[1].data, "syslog:", 7) == 0) {
         peer = ngx_pcalloc(cf->pool, sizeof(ngx_syslog_peer_t));
         if (peer == NULL) {
@@ -694,6 +698,7 @@ ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 
         new_log->writer = ngx_syslog_writer;
         new_log->wdata = peer;
+#endif
 
     } else {
         new_log->file = ngx_conf_open_file(cf->cycle, &value[1]);
