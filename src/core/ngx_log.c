@@ -313,47 +313,6 @@ ngx_log_errno(u_char *buf, u_char *last, ngx_err_t err)
     return buf;
 }
 
-#ifdef LIBNGINX
-ngx_log_t *
-ngx_log_init_name(u_char *name)
-{
-    size_t   nlen;
-
-    ngx_log.file = &ngx_log_file;
-    ngx_log.log_level = NGX_LOG_NOTICE;
-
-    /*
-     * we use ngx_strlen() here since BCC warns about
-     * condition is always false and unreachable code
-     */
-
-    nlen = ngx_strlen(name);
-
-    if (nlen == 0) {
-        ngx_log_file.fd = ngx_stderr;
-        return &ngx_log;
-    }
-
-    ngx_log_file.fd = ngx_open_file(name, NGX_FILE_APPEND,
-                                    NGX_FILE_CREATE_OR_OPEN,
-                                    NGX_FILE_DEFAULT_ACCESS);
-
-    if (ngx_log_file.fd == NGX_INVALID_FILE) {
-        ngx_log_stderr(ngx_errno,
-                       "[alert] could not open error log file: "
-                       ngx_open_file_n " \"%s\" failed", name);
-#if (NGX_WIN32)
-        ngx_event_log(ngx_errno,
-                       "could not open error log file: "
-                       ngx_open_file_n " \"%s\" failed", name);
-#endif
-
-        ngx_log_file.fd = ngx_stderr;
-    }
-
-    return &ngx_log;
-}
-#endif /* LIBNGINX */
 
 ngx_log_t *
 ngx_log_init(u_char *prefix, u_char *error_log)
