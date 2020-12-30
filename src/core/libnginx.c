@@ -12,6 +12,7 @@
 
 /* Copied from src/core/ngx_cycle.c */
 volatile ngx_cycle_t  *ngx_cycle;
+ngx_cycle_t init_cycle;
 
 /* Copied from src/os/unix/ngx_process_cycle.c */
 ngx_pid_t     ngx_pid;
@@ -35,7 +36,6 @@ int libnginx_init(const char *log_filename, unsigned log_level, ngx_uint_t use_s
     log->log_level = log_level;
     ngx_use_stderr = use_stderr;
 
-    ngx_cycle_t init_cycle;
     ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
     init_cycle.log = log;
     ngx_cycle = &init_cycle;
