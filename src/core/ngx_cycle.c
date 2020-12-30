@@ -7,6 +7,7 @@
 
 #include <ngx_config.h>
 #include <ngx_core.h>
+#ifndef LIBNGINX
 #include <ngx_event.h>
 
 
@@ -26,7 +27,9 @@ static ngx_event_t     ngx_cleaner_event;
 static ngx_event_t     ngx_shutdown_event;
 
 ngx_uint_t             ngx_test_config;
+#endif
 ngx_uint_t             ngx_dump_config;
+#ifndef LIBNGINX
 ngx_uint_t             ngx_quiet_mode;
 
 
@@ -1468,3 +1471,4 @@ ngx_shutdown_timer_handler(ngx_event_t *ev)
         c[i].read->handler(c[i].read);
     }
 }
+#endif

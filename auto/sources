@@ -67,6 +67,7 @@ CORE_SRCS="src/core/libnginx.c \
            src/core/ngx_slab.c \
            src/core/ngx_times.c \
            src/core/ngx_shmtx.c \
+           src/core/ngx_cycle.c \
            src/core/ngx_spinlock.c \
            src/core/ngx_rwlock.c \
            src/core/ngx_cpuinfo.c \

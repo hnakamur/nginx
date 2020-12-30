@@ -15,7 +15,6 @@ static ngx_int_t ngx_conf_handler(ngx_conf_t *cf, ngx_int_t last);
 static ngx_int_t ngx_conf_read_token(ngx_conf_t *cf);
 static void ngx_conf_flush_files(ngx_cycle_t *cycle);
 
-
 static ngx_command_t  ngx_conf_commands[] = {
 
     { ngx_string("include"),
