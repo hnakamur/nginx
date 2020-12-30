@@ -19,7 +19,7 @@ ngx_pid_t     ngx_parent;
 
 ngx_int_t     libnginx_debug_points = NGX_DEBUG_POINTS_STOP;
 
-int libnginx_init(const char *log_filename, unsigned log_level, ngx_uint_t use_stderr)
+int libnginx_init(const char *prefix, const char *error_log, unsigned log_level, ngx_uint_t use_stderr)
 {
     ngx_debug_init();
     int ret = ngx_strerror_init();
@@ -31,7 +31,7 @@ int libnginx_init(const char *log_filename, unsigned log_level, ngx_uint_t use_s
     ngx_pid = ngx_getpid();
     ngx_parent = ngx_getppid();
 
-    ngx_log_t *log = ngx_log_init_name((u_char *) log_filename);
+    ngx_log_t *log = ngx_log_init((u_char *) prefix, (u_char *) error_log);
     log->log_level = log_level;
     ngx_use_stderr = use_stderr;
 
