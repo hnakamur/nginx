@@ -63,6 +63,70 @@ int libnginx_init(const char *prefix, const char *error_log, unsigned log_level,
     return NGX_OK;
 }
 
+ngx_int_t
+libnginx_init_shm_pool(ngx_cycle_t *cycle, ngx_shm_t *shm)
+{
+    u_char           *file;
+    ngx_slab_pool_t  *sp;
+
+    sp = (ngx_slab_pool_t *) shm->addr;
+
+    if (shm->exists) {
+
+        if (sp == sp->addr) {
+            return NGX_OK;
+        }
+
+#if (NGX_WIN32)
+
+        /* remap at the required address */
+
+        if (ngx_shm_remap(&zn->shm, sp->addr) != NGX_OK) {
+            return NGX_ERROR;
+        }
+
+        sp = (ngx_slab_pool_t *) shm->addr;
+
+        if (sp == sp->addr) {
+            return NGX_OK;
+        }
+
+#endif
+
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                      "shared zone \"%V\" has no equal addresses: %p vs %p",
+                      &shm->name, sp->addr, sp);
+        return NGX_ERROR;
+    }
+
+    sp->end = shm->addr + shm->size;
+    sp->min_shift = 3;
+    sp->addr = shm->addr;
+
+#if (NGX_HAVE_ATOMIC_OPS)
+
+    file = NULL;
+
+#else
+
+    file = ngx_pnalloc(cycle->pool,
+                       cycle->lock_file.len + shm->name.len + 1);
+    if (file == NULL) {
+        return NGX_ERROR;
+    }
+
+    (void) ngx_sprintf(file, "%V%V%Z", &cycle->lock_file, &shm->name);
+
+#endif
+
+    if (ngx_shmtx_create(&sp->mutex, &sp->lock, file) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    ngx_slab_init(sp);
+
+    return NGX_OK;
+}
 
 int
 libnginx_slab_init_size(ngx_slab_pool_t *pool, size_t pool_size)
