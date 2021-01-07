@@ -21,7 +21,10 @@ ngx_int_t     libnginx_debug_points = NGX_DEBUG_POINTS_STOP;
 
 ngx_cycle_t   init_cycle;
 
-int libnginx_init(const char *prefix, const char *error_log, unsigned log_level, ngx_uint_t use_stderr)
+int
+libnginx_init(const char *prefix, const char *error_log,
+              unsigned log_level, ngx_uint_t use_stderr,
+              ngx_cycle_t **cycle)
 {
     int               ret;
     ngx_log_t        *log;
@@ -44,6 +47,7 @@ int libnginx_init(const char *prefix, const char *error_log, unsigned log_level,
     ngx_memzero(&init_cycle, sizeof(ngx_cycle_t));
     init_cycle.log = log;
     ngx_cycle = &init_cycle;
+    *cycle = (ngx_cycle_t *)ngx_cycle;
 
     ret = ngx_os_init(log);
     if (ret != NGX_OK) {
