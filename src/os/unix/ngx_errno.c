@@ -85,3 +85,22 @@ failed:
 
     return NGX_ERROR;
 }
+
+#ifdef LIBNGINX
+
+void
+ngx_strerror_free(void)
+{
+    ngx_err_t   err;
+
+    if (ngx_sys_errlist != NULL) {
+        for (err = 0; err < NGX_SYS_NERR; err++) {
+            free(ngx_sys_errlist[err].data);
+        }
+
+        free(ngx_sys_errlist);
+        ngx_sys_errlist = NULL;
+    }
+}
+
+#endif /* LIBNGINX */
