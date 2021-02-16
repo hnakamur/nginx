@@ -54,14 +54,6 @@ libnginx_init(const char *prefix, const char *error_log,
         return ret;
     }
 
-    /*
-     * ngx_crc32_table_init() requires ngx_cacheline_size set in ngx_os_init()
-     */
-
-    if (ngx_crc32_table_init() != NGX_OK) {
-        return 1;
-    }
-
     ngx_slab_sizes_init();
 
     return NGX_OK;
