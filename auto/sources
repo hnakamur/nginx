@@ -37,7 +37,9 @@ CORE_DEPS="src/core/libnginx.h \
            src/core/ngx_times.h \
            src/core/ngx_shmtx.h \
            src/core/ngx_connection.h \
+           src/core/ngx_cycle.h \
            src/core/ngx_conf_file.h \
+           src/core/ngx_module.h \
            src/core/ngx_resolver.h \
            src/core/ngx_open_file_cache.h \
            src/core/ngx_crypt.h \
