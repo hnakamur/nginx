@@ -94,6 +94,29 @@ ngx_slab_sizes_init(void)
     }
 }
 
+#ifdef LIBNGINX
+size_t
+ngx_slab_size_for_alloc(ngx_slab_pool_t *pool, size_t size)
+{
+    size_t            s;
+    ngx_uint_t        shift;
+
+    if (size > ngx_slab_max_size) {
+        return ngx_pagesize * ((size >> ngx_pagesize_shift)
+                               + ((size % ngx_pagesize) ? 1 : 0));
+    }
+
+    if (size > pool->min_size) {
+        shift = 1;
+        for (s = size - 1; s >>= 1; shift++) { /* void */ }
+
+    } else {
+        shift = pool->min_shift;
+    }
+
+    return 1 << shift;
+}
+#endif /*LIBNGINX */
 
 void
 ngx_slab_init(ngx_slab_pool_t *pool)
