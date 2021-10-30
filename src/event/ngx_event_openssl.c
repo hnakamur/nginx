@@ -1768,9 +1768,13 @@ ngx_ssl_handshake(ngx_connection_t *c)
 
 #ifdef BIO_get_ktls_send
 
+        ngx_log_error(NGX_LOG_NOTICE, c->log, 0,
+                      "ngx_ssl_handshake: calling BIO_get_ktls_send()");
         if (BIO_get_ktls_send(SSL_get_wbio(c->ssl->connection)) == 1) {
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, 0,
                            "BIO_get_ktls_send(): 1");
+            ngx_log_error(NGX_LOG_NOTICE, c->log, 0,
+                          "ngx_ssl_handshake: BIO_get_ktls_send(): 1");
             c->ssl->sendfile = 1;
         }
 
@@ -1913,9 +1917,13 @@ ngx_ssl_try_early_data(ngx_connection_t *c)
 
 #ifdef BIO_get_ktls_send
 
+        ngx_log_error(NGX_LOG_NOTICE, c->log, 0,
+                      "ngx_ssl_try_early_data: calling BIO_get_ktls_send()");
         if (BIO_get_ktls_send(SSL_get_wbio(c->ssl->connection)) == 1) {
             ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, 0,
                            "BIO_get_ktls_send(): 1");
+            ngx_log_error(NGX_LOG_NOTICE, c->log, 0,
+                          "ngx_ssl_try_early_data: BIO_get_ktls_send(): 1");
             c->ssl->sendfile = 1;
         }
 
