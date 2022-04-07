@@ -1,0 +1,11 @@
+--- src/http/ngx_http_request.c
++++ src/http/ngx_http_request.c
+@@ -814,7 +831,7 @@ ngx_http_ssl_handshake_handler(ngx_connection_t *c)
+ 
+         c->ssl->no_wait_shutdown = 1;
+ 
+-#if (NGX_HTTP_V2                                                              \
++#if ((NGX_HTTP_V2 || NGX_HTTP_V3)                                             \
+      && (defined TLSEXT_TYPE_application_layer_protocol_negotiation           \
+          || defined TLSEXT_TYPE_next_proto_neg))
+         {
