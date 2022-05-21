@@ -55,6 +55,7 @@ NGX_HTTP_UWSGI_TEMP_PATH=
 NGX_HTTP_SCGI_TEMP_PATH=
 
 HTTP_CACHE=YES
+HTTP_BLOCK_CACHE=NO
 HTTP_CHARSET=YES
 HTTP_GZIP=YES
 HTTP_SSL=NO
@@ -218,6 +219,7 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
 
         --without-http)                  HTTP=NO                    ;;
         --without-http-cache)            HTTP_CACHE=NO              ;;
+        --with-http-block-cache)         HTTP_BLOCK_CACHE=YES       ;;
 
         --http-log-path=*)               NGX_HTTP_LOG_PATH="$value" ;;
         --http-client-body-temp-path=*)  NGX_HTTP_CLIENT_TEMP_PATH="$value" ;;

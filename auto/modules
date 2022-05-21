@@ -102,6 +102,12 @@ if [ $HTTP = YES ]; then
     fi
 
 
+    if [ $HTTP_BLOCK_CACHE = YES ]; then
+        have=NGX_HTTP_BLOCK_CACHE . auto/have
+        HTTP_SRCS="$HTTP_SRCS $HTTP_BLOCK_CACHE_SRCS"
+    fi
+
+
     if [ $HTTP_V2 = YES ]; then
         HTTP_SRCS="$HTTP_SRCS $HTTP_HUFF_SRCS"
     fi
