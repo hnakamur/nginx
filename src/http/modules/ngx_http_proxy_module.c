@@ -25,6 +25,7 @@
 
 typedef struct {
     ngx_array_t                    caches;  /* ngx_http_file_cache_t * */
+    ngx_array_t                    block_caches;  /* ngx_http_block_cache_t * */
 } ngx_http_proxy_main_conf_t;
 
 
@@ -520,6 +521,13 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       offsetof(ngx_http_proxy_main_conf_t, caches),
       &ngx_http_proxy_module },
 
+    { ngx_string("proxy_cache_block_path"),
+      NGX_HTTP_MAIN_CONF|NGX_CONF_2MORE,
+      ngx_http_block_cache_set_slot,
+      NGX_HTTP_MAIN_CONF_OFFSET,
+      offsetof(ngx_http_proxy_main_conf_t, block_caches),
+      &ngx_http_proxy_module },
+
     { ngx_string("proxy_cache_bypass"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
       ngx_http_set_predicate_slot,
@@ -977,6 +985,9 @@ ngx_http_proxy_handler(ngx_http_request_t *r)
 
     u->caches = &pmcf->caches;
     u->create_key = ngx_http_proxy_create_key;
+#endif
+#if (NGX_HTTP_BLOCK_CACHE)
+    u->block_caches = &pmcf->block_caches;
 #endif
 
     u->create_request = ngx_http_proxy_create_request;
@@ -3294,6 +3305,15 @@ ngx_http_proxy_create_main_conf(ngx_conf_t *cf)
 #if (NGX_HTTP_CACHE)
     if (ngx_array_init(&conf->caches, cf->pool, 4,
                        sizeof(ngx_http_file_cache_t *))
+        != NGX_OK)
+    {
+        return NULL;
+    }
+#endif
+
+#if (NGX_HTTP_BLOCK_CACHE)
+    if (ngx_array_init(&conf->block_caches, cf->pool, 4,
+                       sizeof(ngx_http_block_cache_t *))
         != NGX_OK)
     {
         return NULL;

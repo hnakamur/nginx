@@ -204,6 +204,45 @@ char *ngx_http_file_cache_valid_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
 
+#define NGX_HTTP_BLOCK_CACHE_KEY_HASH_SIZE       32
+#define NGX_HTTP_BLOCK_CACHE_ENTRY_ID_SIZE       2
+#define NGX_HTTP_BLOCK_CACHE_MAX_ENTRY_ID        65535
+#define NGX_HTTP_BLOCK_CACHE_ENTRY_SIZE          8
+#define NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_BUCKET   4
+#define NGX_HTTP_BLOCK_CACHE_BUCKET_SIZE                                      \
+    (NGX_HTTP_BLOCK_CACHE_ENTRY_SIZE * NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_BUCKET)
+#define NGX_HTTP_BLOCK_CACHE_SEGMENT_SIZE                                     \
+    (NGX_HTTP_BLOCK_CACHE_ENTRY_ID_SIZE                                       \
+     * (NGX_HTTP_BLOCK_CACHE_MAX_ENTRY_ID + 1))
+#define NGX_HTTP_BLOCK_CACHE_FREELIST_SIZE  NGX_HTTP_BLOCK_CACHE_ENTRY_ID_SIZE
+#define NGX_HTTP_BLOCK_CACHE_BUCKETS_IN_SEGMENT                               \
+    ((NGX_HTTP_BLOCK_CACHE_SEGMENT_SIZE - NGX_HTTP_BLOCK_CACHE_FREELIST_SIZE) \
+     / NGX_HTTP_BLOCK_CACHE_BUCKET_SIZE)
+#define NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_SEGMENT                               \
+    (NGX_HTTP_BLOCK_CACHE_BUCKETS_IN_SEGMENT                                  \
+     * NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_BUCKET)
+#define NGX_HTTP_BLOCK_CACHE_FREELIST_OFFSET                                  \
+    (NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_SEGMENT * NGX_HTTP_BLOCK_CACHE_ENTRY_SIZE)
+
+struct ngx_http_block_cache_s {
+    ngx_slab_pool_t                 *shpool;
+
+    ngx_path_t                      *path;
+
+    off_t                            storage_start;
+    off_t                            storage_skip;
+    off_t                            storage_size;
+    off_t                            block_size;
+    off_t                            min_average_object_size;
+    ngx_uint_t                       segments;
+
+    ngx_shm_zone_t                  *shm_zone;
+};
+
+
+char *ngx_http_block_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+
 extern ngx_str_t  ngx_http_cache_status[];
 
 
