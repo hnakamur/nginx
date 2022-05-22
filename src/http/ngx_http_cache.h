@@ -204,6 +204,9 @@ char *ngx_http_file_cache_valid_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
 
+extern ngx_str_t  ngx_http_cache_status[];
+
+
 #define NGX_HTTP_BLOCK_CACHE_KEY_HASH_SIZE       32
 #define NGX_HTTP_BLOCK_CACHE_ENTRY_ID_SIZE       2
 #define NGX_HTTP_BLOCK_CACHE_MAX_ENTRY_ID        65535
@@ -213,18 +216,81 @@ char *ngx_http_file_cache_valid_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
     (NGX_HTTP_BLOCK_CACHE_ENTRY_SIZE * NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_BUCKET)
 #define NGX_HTTP_BLOCK_CACHE_SEGMENT_SIZE                                     \
     (NGX_HTTP_BLOCK_CACHE_ENTRY_ID_SIZE                                       \
-     * (NGX_HTTP_BLOCK_CACHE_MAX_ENTRY_ID + 1))
+     * (NGX_HTTP_BLOCK_CACHE_MAX_ENTRY_ID + 1))  /* 128KiB */
 #define NGX_HTTP_BLOCK_CACHE_FREELIST_SIZE  NGX_HTTP_BLOCK_CACHE_ENTRY_ID_SIZE
 #define NGX_HTTP_BLOCK_CACHE_BUCKETS_IN_SEGMENT                               \
     ((NGX_HTTP_BLOCK_CACHE_SEGMENT_SIZE - NGX_HTTP_BLOCK_CACHE_FREELIST_SIZE) \
-     / NGX_HTTP_BLOCK_CACHE_BUCKET_SIZE)
+     / NGX_HTTP_BLOCK_CACHE_BUCKET_SIZE)         /* 4095 */
 #define NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_SEGMENT                               \
-    (NGX_HTTP_BLOCK_CACHE_BUCKETS_IN_SEGMENT                                  \
-     * NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_BUCKET)
-#define NGX_HTTP_BLOCK_CACHE_FREELIST_OFFSET                                  \
-    (NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_SEGMENT * NGX_HTTP_BLOCK_CACHE_ENTRY_SIZE)
+    (NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_BUCKET                                   \
+     * NGX_HTTP_BLOCK_CACHE_BUCKETS_IN_SEGMENT)  /* 16380 */
+#define NGX_HTTP_BLOCK_CACHE_PADDING_SIZE                                     \
+    (NGX_HTTP_BLOCK_CACHE_SEGMENT_SIZE                                        \
+     - NGX_HTTP_BLOCK_CACHE_BUCKETS_IN_SEGMENT                                \
+       * NGX_HTTP_BLOCK_CACHE_BUCKET_SIZE                                     \
+     - NGX_HTTP_BLOCK_CACHE_ENTRY_ID_SIZE)       /* 30 */
+
+#define NGX_HTTP_BLOCK_CACHE_TAG_WIDTH           12
+#define NGX_HTTP_BLOCK_CACHE_TAG_MASK                                         \
+    ((1 << NGX_HTTP_BLOCK_CACHE_TAG_WIDTH) - 1)
+#define NGX_HTTP_BLOCK_CACHE_HEAD_BIT            (1 << 3)
+
+#define NGX_HTTP_BLOCK_CACHE_EMPTY_ENTRY_ID      0
+#define NGX_HTTP_BLOCK_CACHE_EMPTY_PAGE_ID       0
+
+typedef uint32_t  ngx_http_block_cache_page_id_t;
+typedef uint16_t  ngx_http_block_cache_entry_id_t; /* in segment.entries */
+typedef uint16_t  ngx_http_block_cache_tag_t;
+
+
+typedef union {
+    u_char                           u8[NGX_HTTP_BLOCK_CACHE_KEY_HASH_SIZE];
+    uint32_t                         u32[NGX_HTTP_BLOCK_CACHE_KEY_HASH_SIZE
+                                         / sizeof(uint32_t)];
+} ngx_http_block_cache_key_hash_t;
+
+
+typedef union {
+    uint32_t                         u32[NGX_HTTP_BLOCK_CACHE_ENTRY_SIZE
+                                         / sizeof(uint32_t)];
+    uint16_t                         u16[NGX_HTTP_BLOCK_CACHE_ENTRY_SIZE
+                                         / sizeof(uint16_t)];
+} ngx_http_block_cache_entry_t;
+
+
+typedef struct {
+    ngx_http_block_cache_entry_t
+                                entries[NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_BUCKET];
+} ngx_http_block_cache_bucket_t;
+
+
+typedef struct {
+    union {
+        ngx_http_block_cache_bucket_t
+                               buckets[NGX_HTTP_BLOCK_CACHE_BUCKETS_IN_SEGMENT];
+        ngx_http_block_cache_entry_t
+                               entries[NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_SEGMENT];
+    };
+    ngx_http_block_cache_entry_id_t  freelist;
+    u_char                           padding[NGX_HTTP_BLOCK_CACHE_PADDING_SIZE];
+} ngx_http_block_cache_segment_t;
+
+
+typedef struct {
+    u_char                          *bytes;
+    off_t                            size;
+    ngx_uint_t                       segments;
+    unsigned                         dirty:1;
+} ngx_http_block_cache_dir_t;
+
+
+typedef struct {
+    ngx_http_block_cache_dir_t       dir;
+} ngx_http_block_cache_sh_t;
+
 
 struct ngx_http_block_cache_s {
+    ngx_http_block_cache_sh_t       *sh;
     ngx_slab_pool_t                 *shpool;
 
     ngx_path_t                      *path;
@@ -242,8 +308,6 @@ struct ngx_http_block_cache_s {
 
 char *ngx_http_block_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
-
-extern ngx_str_t  ngx_http_cache_status[];
 
 
 #endif /* _NGX_HTTP_CACHE_H_INCLUDED_ */

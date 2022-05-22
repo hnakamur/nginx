@@ -8,7 +8,32 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+
+static off_t ngx_http_block_cache_calc_dir_size(ngx_http_block_cache_t *cache);
 static void ngx_http_block_cache_calc_segments(ngx_http_block_cache_t *cache);
+static void ngx_http_block_cache_dir_init(ngx_http_block_cache_dir_t *dir);
+static ngx_inline ngx_http_block_cache_segment_t *
+    ngx_http_block_cache_dir_segment(ngx_http_block_cache_dir_t *dir,
+                                     ngx_uint_t i);
+static void
+    ngx_http_block_cache_segment_init(ngx_http_block_cache_segment_t *seg);
+static void
+    ngx_http_block_segment_free_entry(ngx_http_block_cache_segment_t *seg,
+                                      ngx_http_block_cache_entry_id_t ei);    
+static ngx_inline ngx_http_block_cache_tag_t
+    ngx_http_block_cache_key_hash_tag(ngx_http_block_cache_key_hash_t *h);
+static ngx_inline ngx_http_block_cache_tag_t
+    ngx_http_block_cache_entry_tag(ngx_http_block_cache_entry_t *e);
+static ngx_inline ngx_http_block_cache_entry_id_t
+    ngx_http_block_cache_entry_next(ngx_http_block_cache_entry_t *e);
+static ngx_inline void
+    ngx_http_block_cache_entry_set_next(ngx_http_block_cache_entry_t *e,
+                                        ngx_http_block_cache_entry_id_t ei);
+static ngx_inline ngx_http_block_cache_entry_id_t
+    ngx_http_block_cache_entry_prev(ngx_http_block_cache_entry_t *e);
+static ngx_inline void
+    ngx_http_block_cache_entry_set_prev(ngx_http_block_cache_entry_t *e,
+                                        ngx_http_block_cache_entry_id_t ei);
 
 static ngx_int_t
 ngx_http_block_cache_init(ngx_shm_zone_t *shm_zone, void *data)
@@ -48,6 +73,22 @@ ngx_http_block_cache_init(ngx_shm_zone_t *shm_zone, void *data)
         return NGX_OK;
     }
 
+    cache->sh = ngx_slab_alloc(cache->shpool, sizeof(ngx_http_block_cache_sh_t));
+    if (cache->sh == NULL) {
+        return NGX_ERROR;
+    }
+
+    cache->shpool->data = cache->sh;
+
+    cache->sh->dir.segments = cache->segments;
+    cache->sh->dir.size = ngx_http_block_cache_calc_dir_size(cache);
+    cache->sh->dir.bytes = ngx_slab_alloc(cache->shpool, cache->sh->dir.size);
+    if (cache->sh->dir.bytes == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_http_block_cache_dir_init(&cache->sh->dir);
+
     len = sizeof(" in block cache keys zone \"\"") + shm_zone->shm.name.len;
 
     cache->shpool->log_ctx = ngx_slab_alloc(cache->shpool, len);
@@ -62,6 +103,7 @@ ngx_http_block_cache_init(ngx_shm_zone_t *shm_zone, void *data)
 
     return NGX_OK;
 }
+
 
 char *
 ngx_http_block_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
@@ -81,7 +123,7 @@ ngx_http_block_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
      * Maybe it is not initialized yet.
      */
     ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
-                   "ngx_http_block_cache_set_slot start");
+                  "ngx_http_block_cache_set_slot start");
 
     cache = ngx_pcalloc(cf->pool, sizeof(ngx_http_block_cache_t));
     if (cache == NULL) {
@@ -253,13 +295,15 @@ ngx_http_block_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     ngx_http_block_cache_calc_segments(cache);
 
+    ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
+                  "http block cache calc final: %V, segments:%i"
+                  ", storage_start:%O, dir_size:%O",
+                  &cache->path->name, cache->segments, cache->storage_start,
+                  ngx_http_block_cache_calc_dir_size(cache));
+
     cache->path->data = cache;
     cache->path->conf_file = cf->conf_file->file.name.data;
     cache->path->line = cf->conf_file->line;
-
-    ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
-                  "http block cache: %V",
-                  &cache->path->name);
 
     if (ngx_add_path(cf, &cache->path) != NGX_OK) {
         return NGX_CONF_ERROR;
@@ -293,16 +337,21 @@ ngx_http_block_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 
+
 static off_t
-ngx_http_block_cache_calc_dir_size(ngx_http_block_cache_t *cache) {
+ngx_http_block_cache_calc_dir_size(ngx_http_block_cache_t *cache)
+{
     return ngx_align(cache->segments * NGX_HTTP_BLOCK_CACHE_SEGMENT_SIZE,
                      cache->block_size);
 }
 
+
 #define ngx_roundup(d, a)  (((d) + ((a) - 1)) / (a))
 
+
 static void
-ngx_http_block_cache_calc_segments_one_step(ngx_http_block_cache_t *cache) {
+ngx_http_block_cache_calc_segments_one_step(ngx_http_block_cache_t *cache)
+{
     ngx_uint_t  total_entries;
 
     total_entries = (cache->storage_size - cache->storage_start)
@@ -312,14 +361,116 @@ ngx_http_block_cache_calc_segments_one_step(ngx_http_block_cache_t *cache) {
     cache->storage_start = cache->storage_skip
                            + 2 * ngx_http_block_cache_calc_dir_size(cache);
     ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
-                  "http block cache: %V, calc one step, segments:%i"
+                  "http block cache calc one step: %V, segments:%i"
                   ", storage_start:%O",
                   &cache->path->name, cache->segments, cache->storage_start);
 }
 
+
 static void
-ngx_http_block_cache_calc_segments(ngx_http_block_cache_t *cache) {
+ngx_http_block_cache_calc_segments(ngx_http_block_cache_t *cache)
+{
     ngx_http_block_cache_calc_segments_one_step(cache);
     ngx_http_block_cache_calc_segments_one_step(cache);
     ngx_http_block_cache_calc_segments_one_step(cache);
+}
+
+
+static void
+ngx_http_block_cache_dir_init(ngx_http_block_cache_dir_t *dir)
+{
+    ngx_uint_t                       i;
+    ngx_http_block_cache_segment_t  *seg;
+
+    for (i = 0; i < dir->segments; i++) {
+        seg = ngx_http_block_cache_dir_segment(dir, i);
+        ngx_http_block_cache_segment_init(seg);
+    }
+}
+
+
+static ngx_inline ngx_http_block_cache_segment_t *
+ngx_http_block_cache_dir_segment(ngx_http_block_cache_dir_t *dir,
+                                 ngx_uint_t i)
+{
+    return (ngx_http_block_cache_segment_t *)
+           (dir->bytes + i * NGX_HTTP_BLOCK_CACHE_SEGMENT_SIZE);
+}
+
+
+static void
+ngx_http_block_cache_segment_init(ngx_http_block_cache_segment_t *seg)
+{
+    ngx_uint_t                        level, bi;
+    ngx_http_block_cache_entry_id_t   ei;
+
+    for (level = 1; level < NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_BUCKET; level++) {
+        for (bi = 0; bi < NGX_HTTP_BLOCK_CACHE_BUCKETS_IN_SEGMENT; bi++) {
+            ei = bi * NGX_HTTP_BLOCK_CACHE_BUCKETS_IN_SEGMENT + level;
+            ngx_http_block_segment_free_entry(seg, ei);
+        }
+    }
+}
+
+
+static void
+ngx_http_block_segment_free_entry(ngx_http_block_cache_segment_t *seg,
+                                  ngx_http_block_cache_entry_id_t ei)
+{
+    ngx_http_block_cache_entry_t     *e;
+    ngx_http_block_cache_entry_id_t   fi;
+
+    e = &seg->entries[ei];
+    fi = seg->freelist;
+    ngx_http_block_cache_entry_set_next(e, fi);
+    if (fi != NGX_HTTP_BLOCK_CACHE_EMPTY_ENTRY_ID) {
+        ngx_http_block_cache_entry_set_prev(&seg->entries[fi], ei);
+    }
+    seg->freelist = ei;
+}
+
+
+static ngx_inline ngx_http_block_cache_tag_t
+ngx_http_block_cache_key_hash_tag(ngx_http_block_cache_key_hash_t *h)
+{
+    return (ngx_http_block_cache_tag_t)
+           (h->u32[2] & NGX_HTTP_BLOCK_CACHE_TAG_MASK);
+}
+
+
+static ngx_inline ngx_http_block_cache_tag_t
+ngx_http_block_cache_entry_tag(ngx_http_block_cache_entry_t *e)
+{
+    return (ngx_http_block_cache_tag_t)
+           (e->u16[2] >> (16 - NGX_HTTP_BLOCK_CACHE_TAG_WIDTH));
+}
+
+
+static ngx_inline ngx_http_block_cache_entry_id_t
+ngx_http_block_cache_entry_next(ngx_http_block_cache_entry_t *e)
+{
+    return e->u16[3];
+}
+
+
+static ngx_inline void
+ngx_http_block_cache_entry_set_next(ngx_http_block_cache_entry_t *e,
+                                    ngx_http_block_cache_entry_id_t ei)
+{
+    e->u16[3] = ei;
+}
+
+
+static ngx_inline ngx_http_block_cache_entry_id_t
+ngx_http_block_cache_entry_prev(ngx_http_block_cache_entry_t *e)
+{
+    return e->u16[2];
+}
+
+
+static ngx_inline void
+ngx_http_block_cache_entry_set_prev(ngx_http_block_cache_entry_t *e,
+                                    ngx_http_block_cache_entry_id_t ei)
+{
+    e->u16[2] = ei;
 }
