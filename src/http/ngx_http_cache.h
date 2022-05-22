@@ -232,7 +232,7 @@ extern ngx_str_t  ngx_http_cache_status[];
 
 #define NGX_HTTP_BLOCK_CACHE_TAG_WIDTH           12
 #define NGX_HTTP_BLOCK_CACHE_TAG_MASK                                         \
-    ((1 << NGX_HTTP_BLOCK_CACHE_TAG_WIDTH) - 1)
+    ((1 << NGX_HTTP_BLOCK_CACHE_TAG_WIDTH) - 1)  /* 0x0fff */
 #define NGX_HTTP_BLOCK_CACHE_HEAD_BIT            (1 << 3)
 
 #define NGX_HTTP_BLOCK_CACHE_EMPTY_ENTRY_ID      0
@@ -251,6 +251,21 @@ typedef union {
 
 
 typedef union {
+    /*
+     * bit fields for used entry:
+     * page:32    (0-3)
+     * head:1     (4:0)
+     * (unused):3 (4:1-3)
+     * tag:12     (4:4-7,5)
+     * next:16    (6-7)
+     *
+     * bit fields for free entry in freelist:
+     * page:32    (0-3) empty
+     * prev:16    (4-5)
+     * next:16    (6-7)
+     */
+    uint64_t                         u64[NGX_HTTP_BLOCK_CACHE_ENTRY_SIZE
+                                         / sizeof(uint64_t)];
     uint32_t                         u32[NGX_HTTP_BLOCK_CACHE_ENTRY_SIZE
                                          / sizeof(uint32_t)];
     uint16_t                         u16[NGX_HTTP_BLOCK_CACHE_ENTRY_SIZE
@@ -308,6 +323,17 @@ struct ngx_http_block_cache_s {
 
 char *ngx_http_block_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
-
+void ngx_http_block_cache_dir_insert_entry(ngx_http_block_cache_dir_t *dir,
+    const ngx_http_block_cache_key_hash_t *key,
+    const ngx_http_block_cache_entry_t *to_part);
+ngx_flag_t ngx_http_block_cache_dir_overwrite_entry(
+    ngx_http_block_cache_dir_t *dir,
+    const ngx_http_block_cache_key_hash_t *key,
+    const ngx_http_block_cache_entry_t *new,
+    const ngx_http_block_cache_entry_t *old,
+    ngx_flag_t must_overwrite);
+ngx_flag_t ngx_http_block_cache_dir_delete_entry(
+    ngx_http_block_cache_dir_t *dir, const ngx_http_block_cache_key_hash_t *key,
+    const ngx_http_block_cache_entry_t *del);
 
 #endif /* _NGX_HTTP_CACHE_H_INCLUDED_ */
