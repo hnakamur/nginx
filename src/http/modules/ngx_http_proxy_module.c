@@ -219,6 +219,10 @@ static char *ngx_http_proxy_store(ngx_conf_t *cf, ngx_command_t *cmd,
 #if (NGX_HTTP_CACHE)
 static char *ngx_http_proxy_cache(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+#if (NGX_HTTP_BLOCK_CACHE)
+static char *ngx_http_proxy_block_cache(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+#endif
 static char *ngx_http_proxy_cache_key(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 #endif
@@ -506,6 +510,15 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
+
+#if (NGX_HTTP_BLOCK_CACHE)
+    { ngx_string("proxy_block_cache"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_proxy_block_cache,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+#endif
 
     { ngx_string("proxy_cache_key"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
@@ -3408,6 +3421,9 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
     conf->upstream.cache_convert_head = NGX_CONF_UNSET;
     conf->upstream.cache_background_update = NGX_CONF_UNSET;
 #endif
+#if (NGX_HTTP_BLOCK_CACHE)
+    conf->upstream.block_cache = NGX_CONF_UNSET;
+#endif
 
     conf->upstream.hide_headers = NGX_CONF_UNSET_PTR;
     conf->upstream.pass_headers = NGX_CONF_UNSET_PTR;
@@ -3669,6 +3685,31 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
         return NGX_CONF_ERROR;
     }
+
+#if (NGX_HTTP_BLOCK_CACHE)
+
+    if (conf->upstream.block_cache == NGX_CONF_UNSET) {
+        ngx_conf_merge_value(conf->upstream.block_cache,
+                              prev->upstream.block_cache, 0);
+
+        conf->upstream.block_cache_zone = prev->upstream.block_cache_zone;
+        conf->upstream.block_cache_value = prev->upstream.block_cache_value;
+    }
+
+    if (conf->upstream.block_cache_zone
+        && conf->upstream.block_cache_zone->data == NULL)
+    {
+        ngx_shm_zone_t  *shm_zone;
+
+        shm_zone = conf->upstream.block_cache_zone;
+
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "\"proxy_block_cache\" zone \"%V\" is unknown",
+                           &shm_zone->shm.name);
+
+        return NGX_CONF_ERROR;
+    }
+#endif
 
     ngx_conf_merge_uint_value(conf->upstream.cache_min_uses,
                               prev->upstream.cache_min_uses, 1);
@@ -4837,6 +4878,69 @@ ngx_http_proxy_cache(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     return NGX_CONF_OK;
 }
+
+
+#if (NGX_HTTP_BLOCK_CACHE)
+
+static char *
+ngx_http_proxy_block_cache(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_proxy_loc_conf_t *plcf = conf;
+
+    ngx_str_t                         *value;
+    ngx_http_complex_value_t           cv;
+    ngx_http_compile_complex_value_t   ccv;
+
+    value = cf->args->elts;
+
+    if (plcf->upstream.block_cache != NGX_CONF_UNSET) {
+        return "is duplicate";
+    }
+
+    if (ngx_strcmp(value[1].data, "off") == 0) {
+        plcf->upstream.block_cache = 0;
+        return NGX_CONF_OK;
+    }
+
+    if (plcf->upstream.store > 0) {
+        return "is incompatible with \"proxy_store\"";
+    }
+
+    plcf->upstream.block_cache = 1;
+
+    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+    ccv.cf = cf;
+    ccv.value = &value[1];
+    ccv.complex_value = &cv;
+
+    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (cv.lengths != NULL) {
+
+        plcf->upstream.block_cache_value = ngx_palloc(cf->pool,
+                                              sizeof(ngx_http_complex_value_t));
+        if (plcf->upstream.block_cache_value == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        *plcf->upstream.block_cache_value = cv;
+
+        return NGX_CONF_OK;
+    }
+
+    plcf->upstream.block_cache_zone = ngx_shared_memory_add(cf, &value[1], 0,
+                                                        &ngx_http_proxy_module);
+    if (plcf->upstream.block_cache_zone == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    return NGX_CONF_OK;
+}
+
+#endif
 
 
 static char *

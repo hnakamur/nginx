@@ -194,6 +194,10 @@ typedef struct {
 #if (NGX_HTTP_CACHE)
     ngx_shm_zone_t                  *cache_zone;
     ngx_http_complex_value_t        *cache_value;
+#if (NGX_HTTP_BLOCK_CACHE)
+    ngx_shm_zone_t                  *block_cache_zone;
+    ngx_http_complex_value_t        *block_cache_value;
+#endif
 
     ngx_uint_t                       cache_min_uses;
     ngx_uint_t                       cache_use_stale;
@@ -226,6 +230,9 @@ typedef struct {
     unsigned                         change_buffering:1;
     unsigned                         pass_trailers:1;
     unsigned                         preserve_output:1;
+#if (NGX_HTTP_BLOCK_CACHE)
+    signed                           block_cache:2;
+#endif
 
 #if (NGX_HTTP_SSL || NGX_COMPAT)
     ngx_ssl_t                       *ssl;

@@ -15,6 +15,10 @@ static ngx_int_t ngx_http_upstream_cache(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static ngx_int_t ngx_http_upstream_cache_get(ngx_http_request_t *r,
     ngx_http_upstream_t *u, ngx_http_file_cache_t **cache);
+#if (NGX_HTTP_BLOCK_CACHE)
+static ngx_int_t ngx_http_upstream_block_cache_get(ngx_http_request_t *r,
+    ngx_http_upstream_t *u, ngx_http_block_cache_t **block_cache);
+#endif
 static ngx_int_t ngx_http_upstream_cache_send(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static ngx_int_t ngx_http_upstream_cache_background_update(
@@ -822,9 +826,12 @@ found:
 static ngx_int_t
 ngx_http_upstream_cache(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
-    ngx_int_t               rc;
-    ngx_http_cache_t       *c;
-    ngx_http_file_cache_t  *cache;
+    ngx_int_t                rc;
+    ngx_http_cache_t        *c;
+    ngx_http_file_cache_t   *cache;
+#if (NGX_HTTP_BLOCK_CACHE)
+    ngx_http_block_cache_t  *block_cache;
+#endif
 
     c = r->cache;
 
@@ -839,6 +846,14 @@ ngx_http_upstream_cache(ngx_http_request_t *r, ngx_http_upstream_t *u)
         if (rc != NGX_OK) {
             return rc;
         }
+
+#if (NGX_HTTP_BLOCK_CACHE)
+        rc = ngx_http_upstream_block_cache_get(r, u, &block_cache);
+
+        if (rc != NGX_OK) {
+            return rc;
+        }
+#endif
 
         if (r->method == NGX_HTTP_HEAD && u->conf->cache_convert_head) {
             u->method = ngx_http_core_get_method;
@@ -874,6 +889,9 @@ ngx_http_upstream_cache(ngx_http_request_t *r, ngx_http_upstream_t *u)
         c->body_start = u->conf->buffer_size;
         c->min_uses = u->conf->cache_min_uses;
         c->file_cache = cache;
+#if (NGX_HTTP_BLOCK_CACHE)
+        c->block_cache = block_cache;
+#endif
 
         switch (ngx_http_test_predicates(r, u->conf->cache_bypass)) {
 
@@ -1041,6 +1059,65 @@ ngx_http_upstream_cache_get(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
     return NGX_ERROR;
 }
+
+
+#if (NGX_HTTP_BLOCK_CACHE)
+
+static ngx_int_t
+ngx_http_upstream_block_cache_get(ngx_http_request_t *r, ngx_http_upstream_t *u,
+    ngx_http_block_cache_t **block_cache)
+{
+    ngx_str_t                *name, val;
+    ngx_uint_t                i;
+    ngx_http_block_cache_t  **block_caches;
+
+    ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+                  "upstream_block_cache_get start, block_cache_zone=%p",
+                  u->conf->block_cache_zone);
+
+    if (u->conf->block_cache_zone) {
+        *block_cache = u->conf->block_cache_zone->data;
+        ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+                      "upstream_block_cache_get start, block_cache#1=%p",
+                      *block_cache);
+        return NGX_OK;
+    }
+
+    if (ngx_http_complex_value(r, u->conf->block_cache_value, &val) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+                  "upstream_block_cache_get value: \"%V\"", &val);
+
+    if (val.len == 0
+        || (val.len == 3 && ngx_strncmp(val.data, "off", 3) == 0))
+    {
+        return NGX_DECLINED;
+    }
+
+    block_caches = u->block_caches->elts;
+
+    for (i = 0; i < u->block_caches->nelts; i++) {
+        name = &block_caches[i]->shm_zone->shm.name;
+
+        if (name->len == val.len
+            && ngx_strncmp(name->data, val.data, val.len) == 0)
+        {
+            *block_cache = block_caches[i];
+            ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+                          "upstream_block_cache_get zone name: \"%V\"", name);
+            return NGX_OK;
+        }
+    }
+
+    ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                  "block_cache \"%V\" not found", &val);
+
+    return NGX_ERROR;
+}
+
+#endif
 
 
 static ngx_int_t

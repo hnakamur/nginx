@@ -96,6 +96,10 @@ struct ngx_http_cache_s {
     ngx_http_file_cache_t           *file_cache;
     ngx_http_file_cache_node_t      *node;
 
+#if (NGX_HTTP_BLOCK_CACHE)
+    ngx_http_block_cache_t          *block_cache;
+#endif
+
 #if (NGX_THREADS || NGX_COMPAT)
     ngx_thread_task_t               *thread_task;
 #endif

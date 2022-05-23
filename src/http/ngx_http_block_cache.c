@@ -86,10 +86,9 @@ ngx_http_block_cache_init(ngx_shm_zone_t *shm_zone, void *data)
     cache = shm_zone->data;
 
     ngx_log_error(NGX_LOG_NOTICE, shm_zone->shm.log, 0,
-                          "block cache \"%V\" current cache path:\"%V\" "
-                          "ocache=%p",
-                          &shm_zone->shm.name, &cache->path->name,
-                          ocache);
+                  "block cache \"%V\" current cache path:\"%V\" ocache=%p"
+                  ", cache=%p",
+                  &shm_zone->shm.name, &cache->path->name, ocache, cache);
 
     if (ocache) {
         if (ngx_strcmp(cache->path->name.data, ocache->path->name.data) != 0) {
@@ -113,10 +112,14 @@ ngx_http_block_cache_init(ngx_shm_zone_t *shm_zone, void *data)
         return NGX_OK;
     }
 
-    cache->sh = ngx_slab_alloc(cache->shpool, sizeof(ngx_http_block_cache_sh_t));
+    cache->sh = ngx_slab_alloc(cache->shpool,
+                               sizeof(ngx_http_block_cache_sh_t));
     if (cache->sh == NULL) {
         return NGX_ERROR;
     }
+    ngx_log_error(NGX_LOG_NOTICE, shm_zone->shm.log, 0,
+                  "block cache \"%V\" current cache path:\"%V\" cache->sh=%p",
+                  &shm_zone->shm.name, &cache->path->name, cache->sh);
 
     cache->shpool->data = cache->sh;
 
