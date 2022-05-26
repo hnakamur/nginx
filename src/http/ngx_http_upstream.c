@@ -853,6 +853,9 @@ ngx_http_upstream_cache(ngx_http_request_t *r, ngx_http_upstream_t *u)
         if (rc != NGX_OK) {
             return rc;
         }
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http upstream block_cache: %i, %p", rc, block_cache);
+        cache->block_cache_tmp = block_cache;
 #endif
 
         if (r->method == NGX_HTTP_HEAD && u->conf->cache_convert_head) {

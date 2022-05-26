@@ -188,6 +188,8 @@ struct ngx_http_file_cache_s {
 
     ngx_uint_t                       use_temp_path;
                                      /* unsigned use_temp_path:1 */
+
+    ngx_http_block_cache_t          *block_cache_tmp;
 };
 
 
@@ -327,6 +329,10 @@ struct ngx_http_block_cache_s {
 
 char *ngx_http_block_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+ngx_flag_t ngx_http_block_cache_dir_probe_entry(ngx_http_block_cache_dir_t *dir,
+    const ngx_http_block_cache_key_hash_t *key,
+    ngx_http_block_cache_entry_t *result,
+    ngx_http_block_cache_entry_t **last_collision);
 void ngx_http_block_cache_dir_insert_entry(ngx_http_block_cache_dir_t *dir,
     const ngx_http_block_cache_key_hash_t *key,
     const ngx_http_block_cache_entry_t *to_part);
@@ -339,5 +345,12 @@ ngx_flag_t ngx_http_block_cache_dir_overwrite_entry(
 ngx_flag_t ngx_http_block_cache_dir_delete_entry(
     ngx_http_block_cache_dir_t *dir, const ngx_http_block_cache_key_hash_t *key,
     const ngx_http_block_cache_entry_t *del);
+
+ngx_inline void
+ngx_http_block_cache_entry_set_page(ngx_http_block_cache_entry_t *e,
+    ngx_http_block_cache_page_id_t page)
+{
+    e->u32[0] = page;
+}
 
 #endif /* _NGX_HTTP_CACHE_H_INCLUDED_ */

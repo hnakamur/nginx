@@ -823,6 +823,10 @@ ngx_http_file_cache_exists(ngx_http_file_cache_t *cache, ngx_http_cache_t *c)
 {
     ngx_int_t                    rc;
     ngx_http_file_cache_node_t  *fcn;
+    ngx_http_block_cache_key_hash_t  *key =
+        (ngx_http_block_cache_key_hash_t *) &c->key;
+    ngx_flag_t                        block_cache_exists;
+    ngx_http_block_cache_entry_t result, *last_collision = NULL;
 
     ngx_shmtx_lock(&cache->shpool->mutex);
 
@@ -830,6 +834,13 @@ ngx_http_file_cache_exists(ngx_http_file_cache_t *cache, ngx_http_cache_t *c)
 
     if (fcn == NULL) {
         fcn = ngx_http_file_cache_lookup(cache, c->key);
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                       "cache exists lookup result: %p", fcn);
+        block_cache_exists = ngx_http_block_cache_dir_probe_entry(
+            &cache->block_cache_tmp->sh->dir, key, &result, &last_collision
+        );
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                       "cache exists block cache lookup result: %d", block_cache_exists);
     }
 
     if (fcn) {
@@ -897,6 +908,16 @@ ngx_http_file_cache_exists(ngx_http_file_cache_t *cache, ngx_http_cache_t *c)
                NGX_HTTP_CACHE_KEY_LEN - sizeof(ngx_rbtree_key_t));
 
     ngx_rbtree_insert(&cache->sh->rbtree, &fcn->node);
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "ngx_http_file_cache_exists called ngx_rbtree_insert");
+    {
+        ngx_http_block_cache_entry_t to_part;
+        memset(&to_part, 0, sizeof(to_part));
+        ngx_http_block_cache_entry_set_page(&to_part, 1);
+        ngx_http_block_cache_dir_insert_entry(
+            &cache->block_cache_tmp->sh->dir, key, &to_part);
+    }
+
 
     fcn->uses = 1;
     fcn->count = 1;
@@ -1018,6 +1039,8 @@ ngx_http_file_cache_rbtree_insert_value(ngx_rbtree_node_t *temp,
     ngx_rbtree_node_t           **p;
     ngx_http_file_cache_node_t   *cn, *cnt;
 
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "ngx_http_file_cache_rbtree_insert_value start");
     for ( ;; ) {
 
         if (node->key < temp->key) {
@@ -2110,6 +2133,8 @@ ngx_http_file_cache_manage_file(ngx_tree_ctx_t *ctx, ngx_str_t *path)
 
     cache = ctx->data;
 
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "http file cache manager start, path:\"%V\"", path);
     if (ngx_http_file_cache_add_file(ctx, path) != NGX_OK) {
         (void) ngx_http_file_cache_delete_file(ctx, path);
     }
@@ -2247,6 +2272,8 @@ ngx_http_file_cache_add(ngx_http_file_cache_t *cache, ngx_http_cache_t *c)
                    NGX_HTTP_CACHE_KEY_LEN - sizeof(ngx_rbtree_key_t));
 
         ngx_rbtree_insert(&cache->sh->rbtree, &fcn->node);
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                       "ngx_http_file_cache_add inserted");
 
         fcn->uses = 1;
         fcn->exists = 1;

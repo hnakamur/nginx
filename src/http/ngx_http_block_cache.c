@@ -42,8 +42,6 @@ static ngx_inline ngx_http_block_cache_tag_t
     ngx_http_block_cache_key_hash_tag(const ngx_http_block_cache_key_hash_t *h);
 static ngx_inline ngx_http_block_cache_page_id_t
     ngx_http_block_cache_entry_page(const ngx_http_block_cache_entry_t *e);
-static ngx_inline void ngx_http_block_cache_entry_set_page(
-    ngx_http_block_cache_entry_t *e, ngx_http_block_cache_page_id_t page);
 static ngx_inline ngx_flag_t ngx_http_block_cache_entry_is_empty(
     const ngx_http_block_cache_entry_t *e);
 static ngx_inline void ngx_http_block_cache_entry_set_empty(
@@ -432,6 +430,61 @@ ngx_http_block_cache_dir_init(ngx_http_block_cache_dir_t *dir)
 }
 
 
+ngx_flag_t
+ngx_http_block_cache_dir_probe_entry(ngx_http_block_cache_dir_t *dir,
+    const ngx_http_block_cache_key_hash_t *key,
+    ngx_http_block_cache_entry_t *result,
+    ngx_http_block_cache_entry_t **last_collision)
+{
+    ngx_http_block_cache_segment_t   *seg;
+    ngx_uint_t                        si, bi;
+    ngx_http_block_cache_entry_id_t   bei, ei;
+    ngx_http_block_cache_entry_t     *e, *collision;
+    ngx_http_block_cache_tag_t        tag;
+
+    si = ngx_http_block_cache_dir_key_hash_segment(dir, key);
+    seg = ngx_http_block_cache_dir_segment(dir, si);
+    bi = ngx_http_block_cache_key_hash_bucket(key);
+    bei = bi * NGX_HTTP_BLOCK_CACHE_ENTRIES_IN_BUCKET;
+    tag = ngx_http_block_cache_key_hash_tag(key);
+    collision = *last_collision;
+
+again:
+
+    ei = bei;
+    e = &seg->entries[ei];
+    if (!ngx_http_block_cache_entry_is_empty(e)) {
+        for ( ;; ) {
+            if (ngx_http_block_cache_entry_tag(e) == tag) {
+                if (collision) {
+                    if (collision == e) {
+                        collision = NULL;
+                    }
+                    goto cont;
+                }
+                ngx_http_block_cache_entry_copy_from(result, e);
+                *last_collision = e;
+                return 1;
+            }
+
+cont:
+
+            ei = ngx_http_block_cache_entry_next(e);
+            if (ei == NGX_HTTP_BLOCK_CACHE_EMPTY_ENTRY_ID) {
+                break;
+            }
+            e = &seg->entries[ei];
+        }
+    }
+    if (collision) {
+        /* last collision no longer in the list, retry */
+        collision = NULL;
+        goto again;
+    }
+    return 0;
+}
+
+
 void
 ngx_http_block_cache_dir_insert_entry(ngx_http_block_cache_dir_t *dir,
     const ngx_http_block_cache_key_hash_t *key,
@@ -812,14 +865,6 @@ static ngx_inline ngx_http_block_cache_page_id_t
 ngx_http_block_cache_entry_page(const ngx_http_block_cache_entry_t *e)
 {
     return (ngx_http_block_cache_page_id_t) e->u32[0];
-}
-
-
-static ngx_inline void
-ngx_http_block_cache_entry_set_page(ngx_http_block_cache_entry_t *e,
-    ngx_http_block_cache_page_id_t page)
-{
-    e->u32[0] = page;
 }
 
 
