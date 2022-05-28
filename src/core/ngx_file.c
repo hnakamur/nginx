@@ -110,7 +110,14 @@ ngx_write_chain_to_temp_file(ngx_temp_file_t *tf, ngx_chain_t *chain)
 {
     ngx_int_t  rc;
 
+    ngx_log_debug2(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
+                   "ngx_write_chain_to_temp_file: fd=%d, thread_write=%d",
+                   tf->file.fd, tf->thread_write);
+
     if (tf->file.fd == NGX_INVALID_FILE) {
+
+        ngx_log_debug0(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
+                       "ngx_write_chain_to_temp_file: calling ngx_create_temp_file");
         rc = ngx_create_temp_file(&tf->file, tf->path, tf->pool,
                                   tf->persistent, tf->clean, tf->access);
 
@@ -127,12 +134,16 @@ ngx_write_chain_to_temp_file(ngx_temp_file_t *tf, ngx_chain_t *chain)
 #if (NGX_THREADS && NGX_HAVE_PWRITEV)
 
     if (tf->thread_write) {
+        ngx_log_debug0(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
+                       "ngx_write_chain_to_temp_file: calling ngx_thread_write_chain_to_file");
         return ngx_thread_write_chain_to_file(&tf->file, chain, tf->offset,
                                               tf->pool);
     }
 
 #endif
 
+    ngx_log_debug0(NGX_LOG_DEBUG_CORE, ngx_cycle->log, 0,
+                "ngx_write_chain_to_temp_file: calling ngx_write_chain_to_file");
     return ngx_write_chain_to_file(&tf->file, chain, tf->offset, tf->pool);
 }
 

@@ -4049,6 +4049,8 @@ ngx_http_upstream_output_filter(void *data, ngx_chain_t *chain)
     r = data;
     p = r->upstream->pipe;
 
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
+                   "ngx_http_upstream_output_filter");
     rc = ngx_http_output_filter(r, chain);
 
     p->aio = r->aio;
@@ -4099,6 +4101,8 @@ ngx_http_upstream_process_downstream(ngx_http_request_t *r)
             return;
         }
 
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http upstream process downstream event_pipe 1");
         if (ngx_event_pipe(p, 1) == NGX_ABORT) {
             ngx_http_upstream_finalize_request(r, u, NGX_ERROR);
             return;
@@ -4145,6 +4149,8 @@ ngx_http_upstream_process_upstream(ngx_http_request_t *r,
             return;
         }
 
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http upstream process upstream event_pipe 0");
         if (ngx_event_pipe(p, 0) == NGX_ABORT) {
             ngx_http_upstream_finalize_request(r, u, NGX_ERROR);
             return;
@@ -4173,6 +4179,8 @@ ngx_http_upstream_process_request(ngx_http_request_t *r,
          * if there is an incomplete aio write
          */
 
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http upstream process upstream request event_pipe 1");
         if (ngx_event_pipe(p, 1) == NGX_ABORT) {
             ngx_http_upstream_finalize_request(r, u, NGX_ERROR);
             return;

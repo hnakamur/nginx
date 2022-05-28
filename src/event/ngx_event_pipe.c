@@ -742,6 +742,10 @@ ngx_event_pipe_write_chain_to_temp_file(ngx_event_pipe_t *p)
     ngx_uint_t    prev_last_shadow;
     ngx_chain_t  *cl, *tl, *next, *out, **ll, **last_out, **last_free;
 
+    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, p->log, 0,
+                   "ngx_event_pipe_write_chain_to_temp_file start, p->writing=%d, p->buf_to_file=%p",
+                   p->writing, p->buf_to_file);
+
 #if (NGX_THREADS)
 
     if (p->writing) {
@@ -753,6 +757,8 @@ ngx_event_pipe_write_chain_to_temp_file(ngx_event_pipe_t *p)
         out = p->writing;
         p->writing = NULL;
 
+        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, p->log, 0,
+                       "ngx_event_pipe_write_chain_to_temp_file calling ngx_write_chain_to_temp_file");
         n = ngx_write_chain_to_temp_file(p->temp_file, NULL);
 
         if (n == NGX_ERROR) {
