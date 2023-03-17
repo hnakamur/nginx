@@ -93,6 +93,7 @@ typedef struct {
 #define NGX_HTTP_LOG_ESCAPE_DEFAULT  0
 #define NGX_HTTP_LOG_ESCAPE_JSON     1
 #define NGX_HTTP_LOG_ESCAPE_NONE     2
+#define NGX_HTTP_LOG_ESCAPE_LTSV     3
 
 
 static void ngx_http_log_write(ngx_http_request_t *r, ngx_http_log_t *log,
@@ -140,6 +141,10 @@ static uintptr_t ngx_http_log_escape(u_char *dst, u_char *src, size_t size);
 static size_t ngx_http_log_json_variable_getlen(ngx_http_request_t *r,
     uintptr_t data);
 static u_char *ngx_http_log_json_variable(ngx_http_request_t *r, u_char *buf,
+    ngx_http_log_op_t *op);
+static size_t ngx_http_log_ltsv_variable_getlen(ngx_http_request_t *r,
+    uintptr_t data);
+static u_char *ngx_http_log_ltsv_variable(ngx_http_request_t *r, u_char *buf,
     ngx_http_log_op_t *op);
 static size_t ngx_http_log_unescaped_variable_getlen(ngx_http_request_t *r,
     uintptr_t data);
@@ -931,6 +936,11 @@ ngx_http_log_variable_compile(ngx_conf_t *cf, ngx_http_log_op_t *op,
         op->run = ngx_http_log_json_variable;
         break;
 
+    case NGX_HTTP_LOG_ESCAPE_LTSV:
+        op->getlen = ngx_http_log_ltsv_variable_getlen;
+        op->run = ngx_http_log_ltsv_variable;
+        break;
+
     case NGX_HTTP_LOG_ESCAPE_NONE:
         op->getlen = ngx_http_log_unescaped_variable_getlen;
         op->run = ngx_http_log_unescaped_variable;
@@ -1085,6 +1095,47 @@ ngx_http_log_json_variable(ngx_http_request_t *r, u_char *buf,
 
     } else {
         return (u_char *) ngx_escape_json(buf, value->data, value->len);
+    }
+}
+
+
+static size_t
+ngx_http_log_ltsv_variable_getlen(ngx_http_request_t *r, uintptr_t data)
+{
+    uintptr_t                   len;
+    ngx_http_variable_value_t  *value;
+
+    value = ngx_http_get_indexed_variable(r, data);
+
+    if (value == NULL || value->not_found) {
+        return 0;
+    }
+
+    len = ngx_escape_ltsv(NULL, value->data, value->len);
+
+    value->escape = len ? 1 : 0;
+
+    return value->len + len;
+}
+
+
+static u_char *
+ngx_http_log_ltsv_variable(ngx_http_request_t *r, u_char *buf,
+    ngx_http_log_op_t *op)
+{
+    ngx_http_variable_value_t  *value;
+
+    value = ngx_http_get_indexed_variable(r, op->data);
+
+    if (value == NULL || value->not_found) {
+        return buf;
+    }
+
+    if (value->escape == 0) {
+        return ngx_cpymem(buf, value->data, value->len);
+
+    } else {
+        return (u_char *) ngx_escape_ltsv(buf, value->data, value->len);
     }
 }
 
@@ -1600,6 +1651,9 @@ ngx_http_log_compile_format(ngx_conf_t *cf, ngx_array_t *flushes,
 
         } else if (ngx_strcmp(data, "none") == 0) {
             escape = NGX_HTTP_LOG_ESCAPE_NONE;
+
+        } else if (ngx_strcmp(data, "ltsv") == 0) {
+            escape = NGX_HTTP_LOG_ESCAPE_LTSV;
 
         } else if (ngx_strcmp(data, "default") != 0) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,

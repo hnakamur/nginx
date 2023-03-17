@@ -1964,6 +1964,59 @@ ngx_escape_json(u_char *dst, u_char *src, size_t size)
 }
 
 
+uintptr_t
+ngx_escape_ltsv(u_char *dst, u_char *src, size_t size)
+{
+    u_char      ch;
+    ngx_uint_t  len;
+
+    if (dst == NULL) {
+        len = 0;
+
+        while (size) {
+            ch = *src++;
+
+            if (ch == '\n' || ch == '\t' || ch == '\\') {
+                len++;
+            }
+
+            size--;
+        }
+
+        return (uintptr_t) len;
+    }
+
+    while (size) {
+        ch = *src++;
+
+        if (ch == '\n' || ch == '\t' || ch == '\\') {
+            *dst++ = '\\';
+
+            switch (ch) {
+            case '\n':
+                *dst++ = 'n';
+                break;
+
+            case '\t':
+                *dst++ = 't';
+                break;
+
+            case '\\':
+                *dst++ = '\\';
+                break;
+            }
+
+        } else {
+            *dst++ = ch;
+        }
+
+        size--;
+    }
+
+    return (uintptr_t) dst;
+}
+
+
 void
 ngx_str_rbtree_insert_value(ngx_rbtree_node_t *temp,
     ngx_rbtree_node_t *node, ngx_rbtree_node_t *sentinel)
