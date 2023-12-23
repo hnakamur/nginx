@@ -3,7 +3,7 @@ set -eu
 set -x
 if [ $# -eq 1 ]; then
   if [ $1 = "-c" ]; then
-    export CFLAGS="-g -O2 -ffile-prefix-map=/src/nginx=. -flto=auto -ffat-lto-objects -flto=auto -ffat-lto-objects -specs=/usr/share/dpkg/no-pie-compile.specs -fstack-protector-strong -Wformat -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fPIC -Wno-missing-field-initializers -Wno-implicit-fallthrough -I/usr/include/luajit-2.1"
+    export CFLAGS="-g -O2 -ffile-prefix-map=/src/nginx=. -flto=auto -ffat-lto-objects -specs=/usr/share/dpkg/no-pie-compile.specs -fstack-protector-strong -fstack-protector-strong -Wall -Wformat=2 -Werror=unused-variable -Wno-error=conversion -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fPIC -Wno-missing-field-initializers -Wno-implicit-fallthrough -I/usr/include/luajit-2.1"
     export LDFLAGS="-Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -flto=auto -specs=/usr/share/dpkg/no-pie-link.specs -Wl,-z,relro -Wl,-z,now -Wl,--as-needed -pie -lm -lluajit-5.1 -ldl"
     ./auto/configure \
 		--prefix=/etc/nginx \
@@ -79,3 +79,13 @@ sudo rsync -av ./my-config/ /etc/nginx/
 sudo nginx -t
 sudo systemctl restart nginx
 systemctl status nginx
+
+hey -host www1.example.com -c 1 -z 3s http://localhost/limit-conn &
+hey -host www2.example.com -c 9 -z 3s http://localhost/limit-conn &
+hey -host www3.example.com -c 2 -z 3s http://localhost/limit-conn &
+hey -host www4.example.com -c 3 -z 3s http://localhost/limit-conn &
+for i in $(seq 6); do
+  curl -sSD - http://localhost/top-limit-conn || :
+  sleep 0.5
+done
+wait
