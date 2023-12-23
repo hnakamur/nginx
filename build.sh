@@ -75,7 +75,7 @@ if [ $# -eq 1 ]; then
 fi
 make -j
 sudo make install
-sudo rsync -av $HOME/nginx-config/ /etc/nginx/
+sudo rsync -av ./my-config/ /etc/nginx/
 sudo nginx -t
 sudo systemctl restart nginx
 systemctl status nginx
