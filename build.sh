@@ -68,7 +68,6 @@ if [ $# -eq 1 ]; then
 		--add-dynamic-module=./njs/nginx \
 		--add-dynamic-module=./nginx-var-limit-conn-module \
 		--add-dynamic-module=./nginx-var-limit-req-module \
-		--add-dynamic-module=./nginx-var-status-module \
 		--with-cc-opt="${CFLAGS}" \
 		--with-ld-opt="${LDFLAGS}" \
 		--without-pcre2
