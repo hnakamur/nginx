@@ -77,7 +77,11 @@ make -j
 sudo make install
 sudo rsync -av ./my-config/ /etc/nginx/
 sudo nginx -t
-sudo systemctl restart nginx
+sudo systemctl stop nginx
+logtime=$(date +%Y%m%dT%H%M%S)
+sudo mv /var/log/nginx/access.log /var/log/nginx/access.log-$(logtime)
+sudo mv /var/log/nginx/error.log /var/log/nginx/error.log-$(logtime)
+sudo systemctl start nginx
 systemctl status nginx
 
 hey -host www1.example.com -c 1 -z 3s http://localhost/limit-conn &
