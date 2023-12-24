@@ -87,12 +87,11 @@ systemctl status nginx
 if [ ! -f /tmp/random-1m.dat ]; then
   dd if=/dev/random of=/tmp/random-1m.dat bs=1048576 count=1
 fi
-# hey -host www1.example.com -c 3 -z 3s -m POST -D /tmp/random-1m.dat -req-body-rate 262144 -req-body-burst 262144 http://localhost/limit-conn &
-hey -host www1.example.com -c 3 -z 3s -m POST -D /tmp/random-1m.dat http://localhost/limit-conn &
-# hey -host www1.example.com -c 3 -z 3s http://localhost/limit-conn &
-# hey -host www2.example.com -c 9 -z 3s http://localhost/limit-conn &
-# hey -host www3.example.com -c 2 -z 3s http://localhost/limit-conn &
-# hey -host www4.example.com -c 3 -z 3s http://localhost/limit-conn &
+hey -host www1.example.com -c 3 -z 3s -m POST -D /tmp/random-1m.dat -req-body-rate 262144 -req-body-burst 262144 http://localhost/limit-conn &
+hey -host www1.example.com -c 3 -z 3s http://localhost/limit-conn &
+hey -host www2.example.com -c 9 -z 3s http://localhost/limit-conn &
+hey -host www3.example.com -c 2 -z 3s http://localhost/limit-conn &
+hey -host www4.example.com -c 3 -z 3s http://localhost/limit-conn &
 for i in $(seq 6); do
   curl -sSD - http://localhost/top-limit-conn || :
   sleep 0.5
