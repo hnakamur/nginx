@@ -84,7 +84,8 @@ sudo mv /var/log/nginx/error.log /var/log/nginx/error.log-$(logtime)
 sudo systemctl start nginx
 systemctl status nginx
 
-hey -host www1.example.com -c 1 -z 3s http://localhost/limit-conn &
+hey -host www1.example.com -c 3 -z 3s -m POST -d '' http://localhost/limit-conn &
+hey -host www1.example.com -c 3 -z 3s http://localhost/limit-conn &
 hey -host www2.example.com -c 9 -z 3s http://localhost/limit-conn &
 hey -host www3.example.com -c 2 -z 3s http://localhost/limit-conn &
 hey -host www4.example.com -c 3 -z 3s http://localhost/limit-conn &
