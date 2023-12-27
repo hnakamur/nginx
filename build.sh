@@ -81,6 +81,13 @@ sudo systemctl stop nginx
 logtime=$(date +%Y%m%dT%H%M%S)
 sudo mv /var/log/nginx/access.log /var/log/nginx/access.log-$(logtime)
 sudo mv /var/log/nginx/error.log /var/log/nginx/error.log-$(logtime)
+
+cat <<'EOF' | sudo tee /etc/systemd/system/nginx.service.d/override.conf > /dev/null
+[Service]
+MemoryMax=6M
+EOF
+sudo systemctl daemon-reload
+
 sudo systemctl start nginx
 systemctl status nginx
 
@@ -90,13 +97,14 @@ fi
 if [ ! -f /tmp/random-1g.dat ]; then
   dd if=/dev/random of=/tmp/random-1g.dat bs=1048576 count=1024
 fi
-hey -host www1.example.com -c 3 -z 3s -m POST -D /tmp/random-1m.dat -req-body-rate 262144 -req-body-burst 262144 http://localhost/limit-conn &
-hey -host www1.example.com -c 3 -z 3s http://localhost/limit-conn &
-hey -host www2.example.com -c 9 -z 3s http://localhost/limit-conn &
-hey -host www3.example.com -c 2 -z 3s http://localhost/limit-conn &
-hey -host www4.example.com -c 3 -z 3s http://localhost/limit-conn &
-for i in $(seq 6); do
-  curl -sSD - http://localhost/top-limit-conn || :
-  sleep 0.5
-done
+if [ ! -f /var/www/html/index.html ]; then
+  sudo mkdir -p /var/www/html
+  echo welcome to localhost | sudo tee /var/www/html/index.html > /dev/null
+fi
+#hey -host www1.example.com -c 20 -z 3s -m POST -D /tmp/random-1m.dat -req-body-rate 262144 -req-body-burst 262144 http://localhost/limit-mem &
+hey -host www1.example.com -c 20 -z 3s -m POST -D /tmp/random-1m.dat http://localhost/limit-mem &
+#hey -host www1.example.com -c 3 -z 3s http://localhost/limit-mem &
+#hey -host www2.example.com -c 9 -z 3s http://localhost/limit-mem &
+#hey -host www3.example.com -c 2 -z 3s http://localhost/limit-mem &
+#hey -host www4.example.com -c 3 -z 3s http://localhost/limit-mem &
 wait
