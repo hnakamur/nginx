@@ -82,7 +82,7 @@ logtime=$(date +%Y%m%dT%H%M%S)
 sudo mv /var/log/nginx/access.log /var/log/nginx/access.log-${logtime}
 sudo mv /var/log/nginx/error.log /var/log/nginx/error.log-${logtime}
 
-sudo rm -r /etc/systemd/system/nginx.service.d
+sudo rm -rf /etc/systemd/system/nginx.service.d
 #sudo mkdir -p /etc/systemd/system/nginx.service.d
 #cat <<'EOF' | sudo tee /etc/systemd/system/nginx.service.d/override.conf > /dev/null
 #[Service]
