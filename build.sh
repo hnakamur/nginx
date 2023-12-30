@@ -79,9 +79,10 @@ sudo rsync -av ./my-config/ /etc/nginx/
 sudo nginx -t
 sudo systemctl stop nginx
 logtime=$(date +%Y%m%dT%H%M%S)
-sudo mv /var/log/nginx/access.log /var/log/nginx/access.log-$(logtime)
-sudo mv /var/log/nginx/error.log /var/log/nginx/error.log-$(logtime)
+sudo mv /var/log/nginx/access.log /var/log/nginx/access.log-${logtime}
+sudo mv /var/log/nginx/error.log /var/log/nginx/error.log-${logtime}
 
+sudo mkdir -p /etc/systemd/system/nginx.service.d
 cat <<'EOF' | sudo tee /etc/systemd/system/nginx.service.d/override.conf > /dev/null
 [Service]
 MemoryMax=6M
