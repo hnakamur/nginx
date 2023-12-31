@@ -82,13 +82,14 @@ logtime=$(date +%Y%m%dT%H%M%S)
 sudo mv /var/log/nginx/access.log /var/log/nginx/access.log-${logtime}
 sudo mv /var/log/nginx/error.log /var/log/nginx/error.log-${logtime}
 
-sudo rm -rf /etc/systemd/system/nginx.service.d
-#sudo mkdir -p /etc/systemd/system/nginx.service.d
-#cat <<'EOF' | sudo tee /etc/systemd/system/nginx.service.d/override.conf > /dev/null
-#[Service]
-#OOMScoreAdjust=-1000
-#MemoryMax=6M
-#EOF
+# sudo rm -rf /etc/systemd/system/nginx.service.d
+sudo mkdir -p /etc/systemd/system/nginx.service.d
+cat <<'EOF' | sudo tee /etc/systemd/system/nginx.service.d/override.conf > /dev/null
+[Service]
+LimitCORE=infinity
+# OOMScoreAdjust=-1000
+# MemoryMax=6M
+EOF
 sudo systemctl daemon-reload
 
 sudo systemctl start nginx
@@ -104,4 +105,7 @@ if [ ! -f /var/www/html/index.html ]; then
   sudo mkdir -p /var/www/html
   echo welcome to localhost | sudo tee /var/www/html/index.html > /dev/null
 fi
-mulcurloader -u http://localhost/limit-conn -c 511
+./watch_top_limit_req.sh &
+watch_top_limit_req_pid=$!
+mulcurloader --resolve www1.example.com:80:127.0.0.1 -u http://www1.example.com/limit-req -c 511 --delay 1ms
+kill $watch_top_limit_req_pid
