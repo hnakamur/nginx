@@ -105,6 +105,7 @@ if [ ! -f /var/www/html/index.html ]; then
   sudo mkdir -p /var/www/html
   echo welcome to localhost | sudo tee /var/www/html/index.html > /dev/null
 fi
+for i in $(seq 5); do curl -sS -o /dev/null --resolve www$i.example.com:80:127.0.0.1 http://www$i.example.com/limit-req; done
 ./watch_top_limit_req.sh &
 watch_top_limit_req_pid=$!
 mulcurloader --resolve www1.example.com:80:127.0.0.1 -u http://www1.example.com/limit-req -c 511 --delay 1ms
