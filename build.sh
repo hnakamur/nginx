@@ -114,3 +114,4 @@ watch_top_limit_req_pid=$!
 mulcurloader --resolve www1.example.com:80:127.0.0.1 -u http://www1.example.com/limit-req -c 511 --delay 10ms
 kill $watch_top_limit_req_pid
 curl -sSD - http://localhost/top-limit-req
+curl -sSD - 'http://localhost/status-limit-req?key=www1.example.com-A,www1.example.com-B'
