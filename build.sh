@@ -106,12 +106,13 @@ if [ ! -f /var/www/html/index.html ]; then
   echo welcome to localhost | sudo tee /var/www/html/index.html > /dev/null
 fi
 for i in $(seq 5); do
-  curl -sS -o /dev/null --resolve www$i.example.com:80:127.0.0.1 http://www$i.example.com/limit-req
+  curl -sS -o /dev/null --resolve www$i.example.com:80:127.0.0.1 http://www$i.example.com/limit-conn-req
   curl -sSD - http://localhost/top-limit-req
 done
-./watch_top_limit_req.sh &
-watch_top_limit_req_pid=$!
-mulcurloader --resolve www1.example.com:80:127.0.0.1 -u http://www1.example.com/limit-req -c 511 --delay 10ms
-kill $watch_top_limit_req_pid
+./monitor_limit_conn.sh &
+monitor_limit_conn_pid=$!
+mulcurloader --resolve www1.example.com:80:127.0.0.1 -u http://www1.example.com/limit-conn-req -c 511 --delay 10ms
+kill $monitor_limit_conn_pid
 curl -sSD - http://localhost/top-limit-req
+curl -sSD - http://localhost/top-limit-conn
 curl -sSD - 'http://localhost/status-limit-req?key=www1.example.com-A,www1.example.com-B'
