@@ -608,6 +608,7 @@ ngx_http_file_cache_read(ngx_http_request_t *r, ngx_http_cache_t *c)
     c->error_sec = h->error_sec;
     c->last_modified = h->last_modified;
     c->date = h->date;
+    c->initial_age = h->initial_age;
     c->valid_msec = h->valid_msec;
     c->body_start = h->body_start;
     c->etag.len = h->etag_len;
@@ -1263,6 +1264,7 @@ ngx_http_file_cache_set_header(ngx_http_request_t *r, u_char *buf)
     h->error_sec = c->error_sec;
     h->last_modified = c->last_modified;
     h->date = c->date;
+    h->initial_age = c->initial_age;
     h->crc32 = c->crc32;
     h->valid_msec = (u_short) c->valid_msec;
     h->header_start = (u_short) c->header_start;
@@ -1527,6 +1529,7 @@ ngx_http_file_cache_update_header(ngx_http_request_t *r)
     h.error_sec = c->error_sec;
     h.last_modified = c->last_modified;
     h.date = c->date;
+    h.initial_age = c->initial_age;
     h.crc32 = c->crc32;
     h.valid_msec = (u_short) c->valid_msec;
     h.header_start = (u_short) c->header_start;

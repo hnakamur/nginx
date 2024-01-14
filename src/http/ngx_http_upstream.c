@@ -27,6 +27,9 @@ static ngx_int_t ngx_http_upstream_cache_last_modified(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_upstream_cache_etag(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
+
+static off_t ngx_http_upstream_cache_initial_age(ngx_http_request_t *r,
+    ngx_http_upstream_t *u);
 #endif
 
 static void ngx_http_upstream_init_request(ngx_http_request_t *r);
@@ -106,6 +109,8 @@ static ngx_int_t
     ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t ngx_http_upstream_process_content_length(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
+static ngx_int_t ngx_http_upstream_process_date(ngx_http_request_t *r,
+    ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t ngx_http_upstream_process_last_modified(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t ngx_http_upstream_process_set_cookie(ngx_http_request_t *r,
@@ -132,6 +137,8 @@ static ngx_int_t
     ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t ngx_http_upstream_process_vary(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
+static ngx_int_t ngx_http_upstream_process_age(ngx_http_request_t *r,
+    ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t ngx_http_upstream_copy_header_line(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t
@@ -140,6 +147,8 @@ static ngx_int_t
 static ngx_int_t ngx_http_upstream_copy_content_type(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t ngx_http_upstream_copy_last_modified(ngx_http_request_t *r,
+    ngx_table_elt_t *h, ngx_uint_t offset);
+static ngx_int_t ngx_http_upstream_copy_age(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t ngx_http_upstream_rewrite_location(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
@@ -207,10 +216,13 @@ static ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
                  ngx_http_upstream_ignore_header_line, 0, 0 },
 
     { ngx_string("Date"),
-                 ngx_http_upstream_process_header_line,
-                 offsetof(ngx_http_upstream_headers_in_t, date),
+                 ngx_http_upstream_process_date, 0,
                  ngx_http_upstream_copy_header_line,
                  offsetof(ngx_http_headers_out_t, date), 0 },
+
+    { ngx_string("Age"),
+                 ngx_http_upstream_process_age, 0,
+                 ngx_http_upstream_copy_age, 0, 0 },
 
     { ngx_string("Last-Modified"),
                  ngx_http_upstream_process_last_modified, 0,
@@ -499,6 +511,8 @@ ngx_http_upstream_create(ngx_http_request_t *r)
 
     u->headers_in.content_length_n = -1;
     u->headers_in.last_modified_time = -1;
+    u->headers_in.date_time = -1;
+    u->headers_in.age_sec = -1;
 
     return NGX_OK;
 }
@@ -950,6 +964,7 @@ ngx_http_upstream_cache(ngx_http_request_t *r, ngx_http_upstream_t *u)
     case NGX_HTTP_CACHE_STALE:
 
         c->valid_sec = 0;
+        c->valid_sec_set_by_delta = 0;
         c->updating_sec = 0;
         c->error_sec = 0;
 
@@ -1068,6 +1083,8 @@ ngx_http_upstream_cache_send(ngx_http_request_t *r, ngx_http_upstream_t *u)
     ngx_memzero(&u->headers_in, sizeof(ngx_http_upstream_headers_in_t));
     u->headers_in.content_length_n = -1;
     u->headers_in.last_modified_time = -1;
+    u->headers_in.date_time = -1;
+    u->headers_in.age_sec = -1;
 
     if (ngx_list_init(&u->headers_in.headers, r->pool, 8,
                       sizeof(ngx_table_elt_t))
@@ -1090,6 +1107,14 @@ ngx_http_upstream_cache_send(ngx_http_request_t *r, ngx_http_upstream_t *u)
         if (ngx_http_upstream_process_headers(r, u) != NGX_OK) {
             return NGX_DONE;
         }
+
+        r->headers_out.age_sec = u->cache_status == NGX_HTTP_CACHE_REVALIDATED
+                                 ? 0 : c->initial_age + (ngx_time() - c->date);
+
+        ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "http stream cache send, age:%d:%d, cache_status:%d",
+                       r->headers_out.age_sec, c->initial_age,
+                       u->cache_status);
 
         return ngx_http_cache_send(r);
     }
@@ -2006,6 +2031,8 @@ ngx_http_upstream_reinit(ngx_http_request_t *r, ngx_http_upstream_t *u)
     ngx_memzero(&u->headers_in, sizeof(ngx_http_upstream_headers_in_t));
     u->headers_in.content_length_n = -1;
     u->headers_in.last_modified_time = -1;
+    u->headers_in.date_time = -1;
+    u->headers_in.age_sec = -1;
 
     if (ngx_list_init(&u->headers_in.headers, r->pool, 8,
                       sizeof(ngx_table_elt_t))
@@ -2649,6 +2676,7 @@ ngx_http_upstream_test_next(ngx_http_request_t *r, ngx_http_upstream_t *u)
             r->cache->error_sec = error;
 
             r->cache->date = now;
+            r->cache->initial_age = 0;
 
             ngx_http_file_cache_update_header(r);
         }
@@ -2738,6 +2766,7 @@ ngx_http_upstream_intercept_errors(ngx_http_request_t *r,
                                                           status);
                         if (valid) {
                             r->cache->valid_sec = ngx_time() + valid;
+                            r->cache->valid_sec_set_by_delta = 1;
                         }
                     }
 
@@ -3177,11 +3206,21 @@ ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
                                               u->headers_in.status_n);
             if (valid) {
                 r->cache->valid_sec = now + valid;
+                r->cache->valid_sec_set_by_delta = 1;
             }
         }
 
         if (valid) {
             r->cache->date = now;
+            r->cache->initial_age = ngx_http_upstream_cache_initial_age(r, u);
+            if (r->cache->valid_sec_set_by_delta) {
+                r->cache->valid_sec -= r->cache->initial_age;
+            }
+
+            ngx_log_debug2(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                           "http upstream set initial_age: %d, valid_sec: %d",
+                           r->cache->initial_age, r->cache->valid_sec);
+
             r->cache->body_start = (u_short) (u->buffer.pos - u->buffer.start);
 
             if (u->headers_in.status_n == NGX_HTTP_OK
@@ -4741,6 +4780,25 @@ ngx_http_upstream_process_content_length(ngx_http_request_t *r,
 
 
 static ngx_int_t
+ngx_http_upstream_process_date(ngx_http_request_t *r,
+    ngx_table_elt_t *h, ngx_uint_t offset)
+{
+    ngx_http_upstream_t  *u;
+
+    u = r->upstream;
+
+    if (u->headers_in.date_time != -1) {
+        return NGX_OK;
+    }
+
+    u->headers_in.date = h;
+    u->headers_in.date_time = ngx_parse_http_time(h->value.data, h->value.len);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_upstream_process_last_modified(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset)
 {
@@ -4867,6 +4925,7 @@ ngx_http_upstream_process_cache_control(ngx_http_request_t *r,
         }
 
         r->cache->valid_sec = ngx_time() + n;
+        r->cache->valid_sec_set_by_delta = 1;
         u->headers_in.expired = 0;
     }
 
@@ -4970,6 +5029,7 @@ ngx_http_upstream_process_expires(ngx_http_request_t *r, ngx_table_elt_t *h,
     }
 
     r->cache->valid_sec = expires;
+    r->cache->valid_sec_set_by_delta = 0;
     }
 #endif
 
@@ -5029,6 +5089,7 @@ ngx_http_upstream_process_accel_expires(ngx_http_request_t *r,
 
         default:
             r->cache->valid_sec = ngx_time() + n;
+            r->cache->valid_sec_set_by_delta = 1;
             u->headers_in.no_cache = 0;
             u->headers_in.expired = 0;
             return NGX_OK;
@@ -5042,6 +5103,7 @@ ngx_http_upstream_process_accel_expires(ngx_http_request_t *r,
 
     if (n != NGX_ERROR) {
         r->cache->valid_sec = n;
+        r->cache->valid_sec_set_by_delta = 0;
         u->headers_in.no_cache = 0;
         u->headers_in.expired = 0;
     }
@@ -5295,6 +5357,32 @@ ngx_http_upstream_process_vary(ngx_http_request_t *r,
 
 
 static ngx_int_t
+ngx_http_upstream_process_age(ngx_http_request_t *r,
+    ngx_table_elt_t *h, ngx_uint_t offset)
+{
+    ngx_http_upstream_t  *u;
+    ngx_int_t             n;
+
+
+    u = r->upstream;
+
+    /* Use the first Age value and ignore any subsequent values. */
+    if (u->headers_in.age) {
+        return NGX_OK;
+    }
+
+    u->headers_in.age = h;
+
+    n = ngx_atoi(h->value.data, h->value.len);
+
+    if (n != NGX_ERROR) {
+        u->headers_in.age_sec = (time_t) n;
+    }
+
+    return NGX_OK;
+}
+
+static ngx_int_t
 ngx_http_upstream_copy_header_line(ngx_http_request_t *r, ngx_table_elt_t *h,
     ngx_uint_t offset)
 {
@@ -5410,6 +5498,16 @@ ngx_http_upstream_copy_last_modified(ngx_http_request_t *r, ngx_table_elt_t *h,
     r->headers_out.last_modified = ho;
     r->headers_out.last_modified_time =
                                     r->upstream->headers_in.last_modified_time;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_upstream_copy_age(ngx_http_request_t *r, ngx_table_elt_t *h,
+    ngx_uint_t offset)
+{
+    r->headers_out.age_sec = r->upstream->headers_in.age_sec;
 
     return NGX_OK;
 }
@@ -6023,6 +6121,32 @@ ngx_http_upstream_cache_etag(ngx_http_request_t *r,
     v->data = r->cache->etag.data;
 
     return NGX_OK;
+}
+
+
+static time_t
+ngx_http_upstream_cache_initial_age(ngx_http_request_t *r,
+    ngx_http_upstream_t *u)
+{
+    time_t    origin_date, response_time, apparent_age, response_delay,
+              age_value, corrected_age_value, corrected_initial_age;
+
+    response_time = r->cache->date;
+    origin_date = u->headers_in.date_time != -1
+                  ? u->headers_in.date_time : response_time;
+    apparent_age = ngx_max(0, response_time - origin_date);
+
+    age_value = u->headers_in.age_sec != -1 ? u->headers_in.age_sec : 0;
+    response_delay = u->state->header_time / 1000;
+    corrected_age_value = age_value + response_delay;
+
+    corrected_initial_age = ngx_max(apparent_age, corrected_age_value);
+
+    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http upstream, calculate age: %d, %d, %d",
+                   apparent_age, corrected_age_value, corrected_initial_age);
+
+    return corrected_initial_age;
 }
 
 #endif
