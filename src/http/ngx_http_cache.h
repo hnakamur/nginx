@@ -134,7 +134,6 @@ typedef struct {
     time_t                           error_sec;
     time_t                           last_modified;
     time_t                           date;
-    time_t                           initial_age;
     uint32_t                         crc32;
     u_short                          valid_msec;
     u_short                          header_start;
@@ -144,6 +143,26 @@ typedef struct {
     u_char                           vary_len;
     u_char                           vary[NGX_HTTP_CACHE_VARY_LEN];
     u_char                           variant[NGX_HTTP_CACHE_KEY_LEN];
+} ngx_http_file_cache_header_v5_t;
+
+
+typedef struct {
+    ngx_uint_t                       version;
+    time_t                           valid_sec;
+    time_t                           updating_sec;
+    time_t                           error_sec;
+    time_t                           last_modified;
+    time_t                           date;
+    uint32_t                         crc32;
+    u_short                          valid_msec;
+    u_short                          header_start;
+    u_short                          body_start;
+    u_char                           etag_len;
+    u_char                           etag[NGX_HTTP_CACHE_ETAG_LEN];
+    u_char                           vary_len;
+    u_char                           vary[NGX_HTTP_CACHE_VARY_LEN];
+    u_char                           variant[NGX_HTTP_CACHE_KEY_LEN];
+    time_t                           initial_age;
 } ngx_http_file_cache_header_t;
 
 

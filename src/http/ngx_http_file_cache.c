@@ -551,9 +551,14 @@ ngx_http_file_cache_read(ngx_http_request_t *r, ngx_http_cache_t *c)
     h = (ngx_http_file_cache_header_t *) c->buf->pos;
 
     if (h->version != NGX_HTTP_CACHE_VERSION) {
-        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-                      "cache file \"%s\" version mismatch", c->file.name.data);
-        return NGX_DECLINED;
+        if (h->version != NGX_HTTP_CACHE_VERSION - 1) {
+            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                          "cache file \"%s\" version mismatch",
+                          c->file.name.data);
+            return NGX_DECLINED;
+        }
+        c->header_start -= sizeof(ngx_http_file_cache_header_t)
+                           - sizeof(ngx_http_file_cache_header_v5_t);
     }
 
     if (h->crc32 != c->crc32 || (size_t) h->header_start != c->header_start) {
@@ -562,7 +567,10 @@ ngx_http_file_cache_read(ngx_http_request_t *r, ngx_http_cache_t *c)
         return NGX_DECLINED;
     }
 
-    p = c->buf->pos + sizeof(ngx_http_file_cache_header_t)
+    p = c->buf->pos
+        + (h->version == NGX_HTTP_CACHE_VERSION
+           ? sizeof(ngx_http_file_cache_header_t)
+           : sizeof(ngx_http_file_cache_header_v5_t))
         + sizeof(ngx_http_file_cache_key);
 
     key = c->keys.elts;
@@ -1504,7 +1512,8 @@ ngx_http_file_cache_update_header(ngx_http_request_t *r)
         goto done;
     }
 
-    if (h.version != NGX_HTTP_CACHE_VERSION
+    if ((h.version != NGX_HTTP_CACHE_VERSION
+         && h.version != NGX_HTTP_CACHE_VERSION - 1)
         || h.last_modified != c->last_modified
         || h.crc32 != c->crc32
         || (size_t) h.header_start != c->header_start
@@ -1529,11 +1538,13 @@ ngx_http_file_cache_update_header(ngx_http_request_t *r)
     h.error_sec = c->error_sec;
     h.last_modified = c->last_modified;
     h.date = c->date;
-    h.initial_age = c->initial_age;
     h.crc32 = c->crc32;
     h.valid_msec = (u_short) c->valid_msec;
     h.header_start = (u_short) c->header_start;
     h.body_start = (u_short) c->body_start;
+    if (h.version == NGX_HTTP_CACHE_VERSION) {
+        h.initial_age = c->initial_age;
+    }
 
     if (c->etag.len <= NGX_HTTP_CACHE_ETAG_LEN) {
         h.etag_len = (u_char) c->etag.len;
