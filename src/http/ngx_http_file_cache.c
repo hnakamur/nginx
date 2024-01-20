@@ -44,6 +44,8 @@ static ngx_int_t ngx_http_file_cache_reopen(ngx_http_request_t *r,
     ngx_http_cache_t *c);
 static ngx_int_t ngx_http_file_cache_update_variant(ngx_http_request_t *r,
     ngx_http_cache_t *c);
+static void ngx_http_file_cache_upgrade_version(ngx_http_request_t *r,
+    ngx_http_file_cache_header_t *h, ngx_file_t *old_file);
 static void ngx_http_file_cache_cleanup(void *data);
 static time_t ngx_http_file_cache_forced_expire(ngx_http_file_cache_t *cache);
 static time_t ngx_http_file_cache_expire(ngx_http_file_cache_t *cache);
@@ -251,7 +253,7 @@ ngx_http_file_cache_create_key(ngx_http_request_t *r)
         ngx_md5_update(&md5, key[i].data, key[i].len);
     }
 
-    c->header_start = sizeof(ngx_http_file_cache_header_t)
+    c->header_start = sizeof(ngx_http_file_cache_header_v5_t)
                       + sizeof(ngx_http_file_cache_key) + len + 1;
 
     ngx_crc32_final(c->crc32);
@@ -557,7 +559,7 @@ ngx_http_file_cache_read(ngx_http_request_t *r, ngx_http_cache_t *c)
                           c->file.name.data);
             return NGX_DECLINED;
         }
-        c->header_start -= sizeof(ngx_http_file_cache_header_t)
+        c->header_start += sizeof(ngx_http_file_cache_header_t)
                            - sizeof(ngx_http_file_cache_header_v5_t);
     }
 
@@ -1440,15 +1442,99 @@ ngx_http_file_cache_update(ngx_http_request_t *r, ngx_temp_file_t *tf)
 }
 
 
+static void
+ngx_http_file_cache_upgrade_version(ngx_http_request_t *r,
+    ngx_http_file_cache_header_t *h, ngx_file_t *old_file)
+{
+    u_char                 *buf, filename[NGX_MAX_PATH];
+    size_t                  len = 65536;
+    ngx_http_cache_t       *c;
+    ngx_temp_file_t         tf;
+    ngx_err_t               err;
+    off_t                   offset;
+    ssize_t                 n;
+
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http file cache upgrade version");
+
+    buf = ngx_alloc(len, r->connection->log);
+    if (buf == NULL) {
+        return;
+    }
+
+    c = r->cache;
+
+    memcpy(filename, c->file.name.data, c->file.name.len);
+    memcpy(filename + c->file.name.len, ".tmp", sizeof(".tmp"));
+
+    ngx_memzero(&tf, sizeof(ngx_temp_file_t));
+
+    tf.file.name.len = c->file.name.len + sizeof(".tmp") - 1;
+    tf.file.name.data = filename;
+    tf.file.log = r->connection->log;
+    tf.file.fd = ngx_open_file(tf.file.name.data, NGX_FILE_WRONLY,
+                               NGX_FILE_CREATE_OR_OPEN|NGX_FILE_TRUNCATE,
+                               NGX_FILE_OWNER_ACCESS);
+
+    if (tf.file.fd == NGX_INVALID_FILE) {
+        err = ngx_errno;
+
+        /* cache file may have been deleted */
+
+        if (err == NGX_ENOENT) {
+            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                           "http file cache \"%s\" cannot create",
+                           tf.file.name.data);
+            return;
+        }
+
+        ngx_log_error(NGX_LOG_CRIT, r->connection->log, err,
+                      ngx_open_file_n " \"%s\" failed", tf.file.name.data);
+        return;
+    }
+
+    (void) ngx_write_file(&tf.file, (u_char *) h,
+                          sizeof(ngx_http_file_cache_header_t), 0);
+
+    offset = sizeof(ngx_http_file_cache_header_v5_t);
+    for ( ;; ) {
+        n = ngx_read_file(old_file, buf, len, offset);
+        if (n == NGX_ERROR) {
+            return;
+        }
+
+        if (n == 0) {
+            break;
+        }
+
+        ngx_write_file(&tf.file, buf, n,
+                       offset + sizeof(ngx_http_file_cache_header_t)
+                       - sizeof(ngx_http_file_cache_header_v5_t));
+
+        offset += n;
+    }
+
+    if (ngx_close_file(old_file->fd) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_ALERT, r->connection->log, ngx_errno,
+                      ngx_close_file_n " \"%s\" failed", old_file->name.data);
+    }
+
+    c->updated = 0;
+    ngx_http_file_cache_update(r, &tf);
+}
+
+
 void
 ngx_http_file_cache_update_header(ngx_http_request_t *r)
 {
-    ssize_t                        n;
-    ngx_err_t                      err;
-    ngx_file_t                     file;
-    ngx_file_info_t                fi;
-    ngx_http_cache_t              *c;
-    ngx_http_file_cache_header_t   h;
+    ssize_t                           n;
+    ngx_err_t                         err;
+    ngx_file_t                        file;
+    ngx_file_info_t                   fi;
+    ngx_http_cache_t                 *c;
+    ngx_http_file_cache_header_v5_t   h_v5;
+    ngx_http_file_cache_header_t      h;
+    ngx_int_t                         upgrading;
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http file cache update header");
@@ -1498,32 +1584,35 @@ ngx_http_file_cache_update_header(ngx_http_request_t *r)
         goto done;
     }
 
-    n = ngx_read_file(&file, (u_char *) &h,
-                      sizeof(ngx_http_file_cache_header_t), 0);
+    n = ngx_read_file(&file, (u_char *) &h_v5,
+                      sizeof(ngx_http_file_cache_header_v5_t), 0);
 
     if (n == NGX_ERROR) {
         goto done;
     }
 
-    if ((size_t) n != sizeof(ngx_http_file_cache_header_t)) {
+    if ((size_t) n != sizeof(ngx_http_file_cache_header_v5_t)) {
         ngx_log_error(NGX_LOG_CRIT, r->connection->log, 0,
                       ngx_read_file_n " read only %z of %z from \"%s\"",
-                      n, sizeof(ngx_http_file_cache_header_t), file.name.data);
+                      n, sizeof(ngx_http_file_cache_header_v5_t),
+                      file.name.data);
         goto done;
     }
 
-    if ((h.version != NGX_HTTP_CACHE_VERSION
-         && h.version != NGX_HTTP_CACHE_VERSION - 1)
-        || h.last_modified != c->last_modified
-        || h.crc32 != c->crc32
-        || (size_t) h.header_start != c->header_start
-        || (size_t) h.body_start != c->body_start)
+    if ((h_v5.version != NGX_HTTP_CACHE_VERSION
+         && h_v5.version != NGX_HTTP_CACHE_VERSION - 1)
+        || h_v5.last_modified != c->last_modified
+        || h_v5.crc32 != c->crc32
+        || (size_t) h_v5.header_start != c->header_start
+        || (size_t) h_v5.body_start != c->body_start)
     {
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                        "http file cache \"%s\" content changed",
                        file.name.data);
         goto done;
     }
+
+    upgrading = h_v5.version != NGX_HTTP_CACHE_VERSION;
 
     /*
      * update cache file header with new data,
@@ -1542,9 +1631,6 @@ ngx_http_file_cache_update_header(ngx_http_request_t *r)
     h.valid_msec = (u_short) c->valid_msec;
     h.header_start = (u_short) c->header_start;
     h.body_start = (u_short) c->body_start;
-    if (h.version == NGX_HTTP_CACHE_VERSION) {
-        h.initial_age = c->initial_age;
-    }
 
     if (c->etag.len <= NGX_HTTP_CACHE_ETAG_LEN) {
         h.etag_len = (u_char) c->etag.len;
@@ -1562,6 +1648,13 @@ ngx_http_file_cache_update_header(ngx_http_request_t *r)
 
         ngx_http_file_cache_vary(r, c->vary.data, c->vary.len, c->variant);
         ngx_memcpy(h.variant, c->variant, NGX_HTTP_CACHE_KEY_LEN);
+    }
+
+    h.initial_age = c->initial_age;
+
+    if (upgrading) {
+        ngx_http_file_cache_upgrade_version(r, &h, &file);
+        return;
     }
 
     (void) ngx_write_file(&file, (u_char *) &h,
