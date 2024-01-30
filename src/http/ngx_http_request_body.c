@@ -633,6 +633,9 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
     ngx_int_t     rc;
     ngx_event_t  *rev;
 
+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                  "discard_req_body start");
+
     if (r != r->main || r->discard_body || r->request_body) {
         return NGX_OK;
     }
@@ -808,6 +811,11 @@ ngx_http_read_discarded_request_body(ngx_http_request_t *r)
 
         n = r->connection->recv(r->connection, buffer, size);
 
+        if (n <= 0) {
+            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                          "discard_req_body, size=%d, n=%d", size, n);
+        }
+
         if (n == NGX_ERROR) {
             r->connection->error = 1;
             return NGX_OK;
@@ -823,6 +831,10 @@ ngx_http_read_discarded_request_body(ngx_http_request_t *r)
 
         b.pos = buffer;
         b.last = buffer + n;
+
+        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                      "discard_req_body, size=%d, n=%d, buf=%*s...",
+                      size, n, ngx_min(n, 16), buffer);
 
         rc = ngx_http_discard_request_body_filter(r, &b);
 
