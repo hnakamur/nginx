@@ -424,6 +424,11 @@ ngx_http_wait_request_handler(ngx_event_t *rev)
 
     n = c->recv(c, b->last, size);
 
+#if 0
+    ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                  "http_wait_req recv size=%d, n=%d", size, n);
+#endif
+
     if (n == NGX_AGAIN) {
 
         if (!rev->timer_set) {
@@ -594,6 +599,10 @@ ngx_http_alloc_request(ngx_connection_t *c)
     r->read_event_handler = ngx_http_block_reading;
 
     r->header_in = hc->busy ? hc->busy->buf : c->buffer;
+
+    ngx_log_error(NGX_LOG_INFO, c->log, 0, "http_alloc_req is_busy=%d, "
+                  "last-pos=%d",
+                  hc->busy ? 1 : 0, r->header_in->last - r->header_in->pos);
 
     if (ngx_list_init(&r->headers_out.headers, r->pool, 20,
                       sizeof(ngx_table_elt_t))
@@ -1129,6 +1138,11 @@ ngx_http_process_request_line(ngx_event_t *rev)
             r->method_name.len = r->method_end - r->request_start + 1;
             r->method_name.data = r->request_line.data;
 
+#if 0
+            ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                          "http_process_req_line method=%V", &r->method_name);
+#endif
+
             if (r->http_protocol.data) {
                 r->http_protocol.len = r->request_end - r->http_protocol.data;
             }
@@ -1573,6 +1587,11 @@ ngx_http_read_request_header(ngx_http_request_t *r)
     if (rev->ready) {
         n = c->recv(c, r->header_in->last,
                     r->header_in->end - r->header_in->last);
+
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                      "http_read_req_hader recv bufsize=%d, n=%d",
+                      r->header_in->end - r->header_in->last, n);
+
     } else {
         n = NGX_AGAIN;
     }
@@ -1981,6 +2000,11 @@ ngx_http_process_request_header(ngx_http_request_t *r)
         r->headers_in.content_length_n =
                             ngx_atoof(r->headers_in.content_length->value.data,
                                       r->headers_in.content_length->value.len);
+#if 0
+        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                      "http_process_req_header content_length=%d",
+                      r->headers_in.content_length_n);
+#endif
 
         if (r->headers_in.content_length_n == NGX_ERROR) {
             ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
@@ -3153,6 +3177,10 @@ ngx_http_set_keepalive(ngx_http_request_t *r)
             cl->buf = b;
             cl->next = NULL;
 
+            ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                          "http_set_keepalive cl->buf=b=%p, b->last=%d, b->pos=%d",
+                          b, b->last, b->pos);
+
             hc->busy = cl;
             hc->nbusy = 1;
         }
@@ -3414,6 +3442,11 @@ ngx_http_keepalive_handler(ngx_event_t *rev)
     }
 
     b->last += n;
+#if 0
+    ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                  "http_keepalive_handler, b=%p, size=%d, b->last += n(=%d)",
+                  b, size, n);
+#endif
 
     c->log->handler = ngx_http_log_error;
     c->log->action = "reading client request line";
