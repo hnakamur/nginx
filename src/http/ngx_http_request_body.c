@@ -948,7 +948,7 @@ ngx_http_discard_request_body_filter(ngx_http_request_t *r, ngx_buf_t *b)
             b->pos = b->last;
             r->headers_in.content_length_n -= size;
             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                         "discard_req_body, updated content_lenght=%d, size=%d",
+                         "discard_req_body, updated content_length=%d, size=%d",
                           r->headers_in.content_length_n, size);
         }
     }
