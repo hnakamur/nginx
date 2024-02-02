@@ -665,6 +665,10 @@ ngx_http_discard_request_body(ngx_http_request_t *r)
         ngx_del_timer(rev);
     }
 
+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                  "discard_req_body content_length=%d, chunked=%d",
+                  r->headers_in.content_length_n, r->headers_in.chunked);
+
     if (r->headers_in.content_length_n <= 0 && !r->headers_in.chunked) {
         return NGX_OK;
     }
@@ -811,6 +815,10 @@ ngx_http_read_discarded_request_body(ngx_http_request_t *r)
 
         n = r->connection->recv(r->connection, buffer, size);
 
+        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                      "discard_req_body recv, content_length=%d, size=%d, n=%d",
+                      r->headers_in.content_length_n, size, n);
+
         if (n <= 0) {
             ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
                           "discard_req_body, size=%d, n=%d", size, n);
@@ -939,6 +947,9 @@ ngx_http_discard_request_body_filter(ngx_http_request_t *r, ngx_buf_t *b)
         } else {
             b->pos = b->last;
             r->headers_in.content_length_n -= size;
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                         "discard_req_body, updated content_lenght=%d, size=%d",
+                          r->headers_in.content_length_n, size);
         }
     }
 
