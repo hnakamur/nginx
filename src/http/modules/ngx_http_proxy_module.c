@@ -25,6 +25,7 @@
 
 typedef struct {
     ngx_array_t                    caches;  /* ngx_http_file_cache_t * */
+    ngx_array_t                    lmdb_caches;  /* ngx_http_lmdb_cache_t * */
 } ngx_http_proxy_main_conf_t;
 
 
@@ -243,6 +244,10 @@ static ngx_int_t ngx_http_proxy_set_ssl(ngx_conf_t *cf,
 #endif
 static void ngx_http_proxy_set_vars(ngx_url_t *u, ngx_http_proxy_vars_t *v);
 
+#if (NGX_HTTP_LMDB_CACHE)
+static char *ngx_http_proxy_lmdb_cache(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+#endif
 
 static ngx_conf_post_t  ngx_http_proxy_lowat_post =
     { ngx_http_proxy_lowat_check };
@@ -615,6 +620,24 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
 
 #endif
 
+#if (NGX_HTTP_LMDB_CACHE)
+
+    { ngx_string("proxy_lmdb_cache"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_http_proxy_lmdb_cache,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("proxy_lmdb_cache_path"),
+      NGX_HTTP_MAIN_CONF|NGX_CONF_2MORE,
+      ngx_http_lmdb_cache_set_slot,
+      NGX_HTTP_MAIN_CONF_OFFSET,
+      offsetof(ngx_http_proxy_main_conf_t, lmdb_caches),
+      &ngx_http_proxy_module },
+
+#endif
+
     { ngx_string("proxy_temp_path"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1234,
       ngx_conf_set_path_slot,
@@ -979,6 +1002,10 @@ ngx_http_proxy_handler(ngx_http_request_t *r)
 
     u->caches = &pmcf->caches;
     u->create_key = ngx_http_proxy_create_key;
+#endif
+
+#if (NGX_HTTP_LMDB_CACHE)
+    u->caches = &pmcf->lmdb_caches;
 #endif
 
     u->create_request = ngx_http_proxy_create_request;
@@ -3306,6 +3333,15 @@ ngx_http_proxy_create_main_conf(ngx_conf_t *cf)
     }
 #endif
 
+#if (NGX_HTTP_LMDB_CACHE)
+    if (ngx_array_init(&conf->lmdb_caches, cf->pool, 4,
+                       sizeof(ngx_http_file_cache_t *))
+        != NGX_OK)
+    {
+        return NULL;
+    }
+#endif
+
     return conf;
 }
 
@@ -5111,3 +5147,14 @@ ngx_http_proxy_set_vars(ngx_url_t *u, ngx_http_proxy_vars_t *v)
 
     v->uri = u->uri;
 }
+
+
+#if (NGX_HTTP_LMDB_CACHE)
+
+static char *
+ngx_http_proxy_lmdb_cache(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    return NULL;
+}
+
+#endif

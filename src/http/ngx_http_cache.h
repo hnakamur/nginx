@@ -187,6 +187,28 @@ struct ngx_http_file_cache_s {
 };
 
 
+#if (NGX_HTTP_LMDB_CACHE)
+
+typedef struct {
+    ngx_rbtree_t                     rbtree;
+    ngx_rbtree_node_t                sentinel;
+    ngx_queue_t                      queue;
+    off_t                            size;
+    ngx_uint_t                       count;
+    ngx_uint_t                       watermark;
+} ngx_http_lmdb_cache_sh_t;
+
+
+struct ngx_http_lmdb_cache_s {
+    ngx_http_lmdb_cache_sh_t        *sh;
+    ngx_slab_pool_t                 *shpool;
+
+    ngx_path_t                      *path;
+
+};
+
+#endif
+
 ngx_int_t ngx_http_file_cache_new(ngx_http_request_t *r);
 ngx_int_t ngx_http_file_cache_create(ngx_http_request_t *r);
 void ngx_http_file_cache_create_key(ngx_http_request_t *r);
@@ -203,6 +225,10 @@ char *ngx_http_file_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
 char *ngx_http_file_cache_valid_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
+#if (NGX_HTTP_LMDB_CACHE)
+char *ngx_http_lmdb_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
+#endif
 
 extern ngx_str_t  ngx_http_cache_status[];
 

@@ -336,6 +336,9 @@ struct ngx_http_upstream_s {
 #if (NGX_HTTP_CACHE)
     ngx_array_t                     *caches;
 #endif
+#if (NGX_HTTP_LMDB_CACHE)
+    ngx_array_t                     *lmdb_caches;
+#endif
 
     ngx_http_upstream_headers_in_t   headers_in;
 

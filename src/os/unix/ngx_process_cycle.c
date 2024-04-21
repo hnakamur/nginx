@@ -26,7 +26,10 @@ static void ngx_channel_handler(ngx_event_t *ev);
 static void ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data);
 static void ngx_cache_manager_process_handler(ngx_event_t *ev);
 static void ngx_cache_loader_process_handler(ngx_event_t *ev);
-
+#if (NGX_HTTP_LMDB_CACHE)
+static void ngx_lmdb_writer_process_cycle(ngx_cycle_t *cycle, void *data);
+static void ngx_lmdb_writer_process_handler(ngx_event_t *ev);
+#endif
 
 ngx_uint_t    ngx_process;
 ngx_uint_t    ngx_worker;
@@ -64,6 +67,11 @@ static ngx_cache_manager_ctx_t  ngx_cache_loader_ctx = {
     ngx_cache_loader_process_handler, "cache loader process", 60000
 };
 
+#if (NGX_HTTP_LMDB_CACHE)
+static ngx_cache_manager_ctx_t  ngx_lmdb_writer_ctx = {
+    ngx_lmdb_writer_process_handler, "lmdb writer process", 0
+};
+#endif
 
 static ngx_cycle_t      ngx_exit_cycle;
 static ngx_log_t        ngx_exit_log;
@@ -369,6 +377,14 @@ ngx_start_cache_manager_processes(ngx_cycle_t *cycle, ngx_uint_t respawn)
             loader = 1;
         }
     }
+
+#if (NGX_HTTP_LMDB_CACHE)
+    ngx_spawn_process(cycle, ngx_lmdb_writer_process_cycle,
+                      &ngx_lmdb_writer_ctx, "lmdb writer process",
+                      respawn ? NGX_PROCESS_JUST_SPAWN : NGX_PROCESS_NORESPAWN);
+
+    ngx_pass_open_channel(cycle);
+#endif
 
     if (manager == 0) {
         return;
@@ -1189,3 +1205,68 @@ ngx_cache_loader_process_handler(ngx_event_t *ev)
 
     exit(0);
 }
+
+
+#if (NGX_HTTP_LMDB_CACHE)
+
+static void
+ngx_lmdb_writer_process_cycle(ngx_cycle_t *cycle, void *data)
+{
+    ngx_cache_manager_ctx_t *ctx = data;
+
+    ngx_event_t   ev;
+
+    /*
+     * Set correct process type since closing listening Unix domain socket
+     * in a master process also removes the Unix domain socket file.
+     */
+    ngx_process = NGX_PROCESS_HELPER;
+
+    ngx_close_listening_sockets(cycle);
+
+    /* Set a moderate number of connections for a helper process. */
+    cycle->connection_n = 512;
+
+    ngx_worker_process_init(cycle, -1);
+
+    ngx_memzero(&ev, sizeof(ngx_event_t));
+    ev.handler = ngx_lmdb_writer_process_handler;
+    ev.log = cycle->log;
+
+    ngx_use_accept_mutex = 0;
+
+    ngx_setproctitle(ctx->name);
+
+    ngx_add_timer(&ev, ctx->delay);
+
+    for ( ;; ) {
+
+        if (ngx_terminate || ngx_quit) {
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
+            exit(0);
+        }
+
+        if (ngx_reopen) {
+            ngx_reopen = 0;
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "reopening logs");
+            ngx_reopen_files(cycle, -1);
+        }
+
+        ngx_process_events_and_timers(cycle);
+    }
+}
+
+static void
+ngx_lmdb_writer_process_handler(ngx_event_t *ev)
+{
+    ngx_msec_t    next;
+
+    next = 10 * 1000;
+
+    ngx_log_error(NGX_LOG_NOTICE, ev->log, 0,
+                  "ngx_lmdb_writer_process_handler() called");
+
+    ngx_add_timer(ev, next);
+}
+
+#endif
