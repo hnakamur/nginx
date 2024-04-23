@@ -971,6 +971,8 @@ renew:
     fcn->uniq = 0;
     fcn->body_start = 0;
     fcn->fs_size = 0;
+    fcn->response_time = 0;
+    fcn->corrected_initial_age = 0;
 
 done:
 
@@ -981,6 +983,8 @@ done:
     c->uniq = fcn->uniq;
     c->error = fcn->error;
     c->node = fcn;
+    c->response_time = fcn->response_time;
+    c->corrected_initial_age = fcn->corrected_initial_age;
 
 failed:
 
@@ -1479,6 +1483,9 @@ ngx_http_file_cache_update(ngx_http_request_t *r, ngx_temp_file_t *tf)
     cache->sh->size += fs_size - c->node->fs_size;
     c->node->fs_size = fs_size;
 
+    c->node->response_time = c->response_time;
+    c->node->corrected_initial_age = c->corrected_initial_age;
+
     if (rc == NGX_OK) {
         c->node->exists = 1;
     }
@@ -1621,6 +1628,42 @@ done:
 }
 
 
+static ngx_table_elt_t *
+ngx_find_header(ngx_list_t *headers, ngx_uint_t hash, ngx_str_t *key)
+{
+    ngx_uint_t        i;
+    ngx_table_elt_t  *h;
+    ngx_list_part_t  *part;
+
+    part = &headers->part;
+    h = part->elts;
+    for (i = 0; /* void */; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+
+            part = part->next;
+            h = part->elts;
+            i = 0;
+        }
+
+        if (h[i].hash == 0) {
+            continue;
+        }
+
+        if (h[i].hash == hash && h[i].key.len == key->len &&
+            ngx_strcasecmp(h[i].key.data, key->data) == 0)
+        {
+            return &h[i];
+        }
+    }
+
+    return NULL;
+}
+
+
 ngx_int_t
 ngx_http_cache_send(ngx_http_request_t *r)
 {
@@ -1644,6 +1687,40 @@ ngx_http_cache_send(ngx_http_request_t *r)
     b->file = ngx_pcalloc(r->pool, sizeof(ngx_file_t));
     if (b->file == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    /* replace or append Age header */
+    {
+        time_t            resident_time, current_age;
+        ngx_str_t         age_key = ngx_string("Age");
+        ngx_uint_t        hash;
+        ngx_table_elt_t  *h;
+
+        resident_time = ngx_time() - c->response_time;
+        current_age = c->corrected_initial_age + resident_time;
+
+        /* search Age header */
+        hash = ngx_hash_key_lc(age_key.data, age_key.len);
+        h = ngx_find_header(&r->headers_out.headers, hash, &age_key);
+
+        // append Age header when not found
+        if (!h) {
+            h = ngx_list_push(&r->headers_out.headers);
+            if (h == NULL) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            h->hash = hash;
+            ngx_str_set(&h->key, "Age");
+            h->lowcase_key = (u_char *) "age";
+        }
+
+        h->value.data = ngx_pcalloc(r->pool, NGX_SIZE_T_LEN + 1);
+        if (h->value.data == NULL) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+        h->value.len = ngx_sprintf(h->value.data, "%O", current_age)
+                       - h->value.data;
     }
 
     rc = ngx_http_send_header(r);
