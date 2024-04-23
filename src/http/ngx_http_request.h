@@ -391,6 +391,9 @@ struct ngx_http_request_s {
 #if (NGX_HTTP_CACHE)
     ngx_http_cache_t                 *cache;
 #endif
+#if (NGX_HTTP_LMDB_CACHE)
+    ngx_http_lmdb_cache_t            *lmdb_cache;
+#endif
 
     ngx_http_upstream_t              *upstream;
     ngx_array_t                      *upstream_states;

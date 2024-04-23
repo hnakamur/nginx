@@ -190,21 +190,132 @@ struct ngx_http_file_cache_s {
 #if (NGX_HTTP_LMDB_CACHE)
 
 typedef struct {
-    ngx_rbtree_t                     rbtree;
-    ngx_rbtree_node_t                sentinel;
-    ngx_queue_t                      queue;
+    u_char                           key[NGX_HTTP_CACHE_KEY_LEN
+                                         - sizeof(ngx_rbtree_key_t)];
+
+    unsigned                         count:20;
+    unsigned                         uses:10;
+    unsigned                         valid_msec:10;
+    unsigned                         error:10;
+    unsigned                         exists:1;
+    unsigned                         updating:1;
+    unsigned                         deleting:1;
+    unsigned                         purged:1;
+                                     /* 10 unused bits */
+
+    time_t                           expire;
+    time_t                           valid_sec;
+    size_t                           body_start;
+    off_t                            fs_size;
+    ngx_msec_t                       lock_time;
+    time_t                           date;
+    time_t                           initial_age;
+} ngx_http_lmdb_cache_node_t;
+
+
+struct ngx_http_lmdb_cache_s {
+    ngx_file_t                       file;
+    ngx_array_t                      keys;
+    uint32_t                         crc32;
+    u_char                           key[NGX_HTTP_CACHE_KEY_LEN];
+    u_char                           main[NGX_HTTP_CACHE_KEY_LEN];
+
+    ngx_file_uniq_t                  uniq;
+    time_t                           valid_sec;
+    time_t                           updating_sec;
+    time_t                           error_sec;
+    time_t                           last_modified;
+    time_t                           date;
+    time_t                           initial_age;
+
+    ngx_str_t                        etag;
+    ngx_str_t                        vary;
+    u_char                           variant[NGX_HTTP_CACHE_KEY_LEN];
+
+    size_t                           buffer_size;
+    size_t                           header_start;
+    size_t                           body_start;
+    off_t                            length;
+    off_t                            fs_size;
+
+    ngx_uint_t                       min_uses;
+    ngx_uint_t                       error;
+    ngx_uint_t                       valid_msec;
+    ngx_uint_t                       vary_tag;
+
+    ngx_buf_t                       *buf;
+
+    ngx_http_lmdb_cache_ctx_t       *lmdb_cache_ctx;
+#if 0
+    ngx_http_file_cache_node_t      *node;
+#endif
+
+#if (NGX_THREADS || NGX_COMPAT)
+    ngx_thread_task_t               *thread_task;
+#endif
+
+    ngx_msec_t                       lock_timeout;
+    ngx_msec_t                       lock_age;
+    ngx_msec_t                       lock_time;
+    ngx_msec_t                       wait_time;
+
+    ngx_event_t                      wait_event;
+
+    unsigned                         lock:1;
+    unsigned                         waiting:1;
+
+    unsigned                         updated:1;
+    unsigned                         updating:1;
+    unsigned                         exists:1;
+    unsigned                         temp_file:1;
+    unsigned                         purged:1;
+    unsigned                         reading:1;
+    unsigned                         secondary:1;
+    unsigned                         update_variant:1;
+    unsigned                         background:1;
+
+    unsigned                         stale_updating:1;
+    unsigned                         stale_error:1;
+};
+
+
+typedef struct {
+    ngx_queue_t                      submission_queue;
+    ngx_queue_t                      completion_queue;
     off_t                            size;
     ngx_uint_t                       count;
     ngx_uint_t                       watermark;
 } ngx_http_lmdb_cache_sh_t;
 
 
-struct ngx_http_lmdb_cache_s {
+struct ngx_http_lmdb_cache_ctx_s {
     ngx_http_lmdb_cache_sh_t        *sh;
     ngx_slab_pool_t                 *shpool;
 
     ngx_path_t                      *path;
 
+    off_t                            min_free;
+    off_t                            max_size;
+    size_t                           bsize;
+
+    time_t                           inactive;
+
+    time_t                           fail_time;
+
+    ngx_uint_t                       files;
+    ngx_uint_t                       loader_files;
+    ngx_msec_t                       last;
+    ngx_msec_t                       loader_sleep;
+    ngx_msec_t                       loader_threshold;
+
+    ngx_uint_t                       manager_files;
+    ngx_msec_t                       manager_sleep;
+    ngx_msec_t                       manager_threshold;
+
+    ngx_shm_zone_t                  *shm_zone;
+
+    ngx_uint_t                       use_temp_path;
+                                     /* unsigned use_temp_path:1 */
 };
 
 #endif

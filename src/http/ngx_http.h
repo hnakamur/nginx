@@ -18,7 +18,8 @@ typedef struct ngx_http_upstream_s    ngx_http_upstream_t;
 typedef struct ngx_http_cache_s       ngx_http_cache_t;
 typedef struct ngx_http_file_cache_s  ngx_http_file_cache_t;
 #if (NGX_HTTP_LMDB_CACHE)
-typedef struct ngx_http_lmdb_cache_s  ngx_http_lmdb_cache_t;
+typedef struct ngx_http_lmdb_cache_s      ngx_http_lmdb_cache_t;
+typedef struct ngx_http_lmdb_cache_ctx_s  ngx_http_lmdb_cache_ctx_t;
 #endif
 typedef struct ngx_http_log_ctx_s     ngx_http_log_ctx_t;
 typedef struct ngx_http_chunked_s     ngx_http_chunked_t;
