@@ -971,6 +971,8 @@ renew:
     fcn->uniq = 0;
     fcn->body_start = 0;
     fcn->fs_size = 0;
+    fcn->response_time = 0;
+    fcn->corrected_initial_age = 0;
 
 done:
 
@@ -981,6 +983,8 @@ done:
     c->uniq = fcn->uniq;
     c->error = fcn->error;
     c->node = fcn;
+    c->response_time = fcn->response_time;
+    c->corrected_initial_age = fcn->corrected_initial_age;
 
 failed:
 
@@ -1479,6 +1483,9 @@ ngx_http_file_cache_update(ngx_http_request_t *r, ngx_temp_file_t *tf)
     cache->sh->size += fs_size - c->node->fs_size;
     c->node->fs_size = fs_size;
 
+    c->node->response_time = c->response_time;
+    c->node->corrected_initial_age = c->corrected_initial_age;
+
     if (rc == NGX_OK) {
         c->node->exists = 1;
     }
@@ -1624,6 +1631,7 @@ done:
 ngx_int_t
 ngx_http_cache_send(ngx_http_request_t *r)
 {
+    time_t             resident_time, current_age;
     ngx_int_t          rc;
     ngx_buf_t         *b;
     ngx_chain_t        out;
@@ -1645,6 +1653,13 @@ ngx_http_cache_send(ngx_http_request_t *r)
     if (b->file == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
+
+    resident_time = ngx_time() - c->response_time;
+    current_age = c->corrected_initial_age + resident_time;
+    r->headers_out.age_n = current_age;
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "resident_time=%d, current_age=%d",
+                   resident_time, current_age);
 
     rc = ngx_http_send_header(r);
 
