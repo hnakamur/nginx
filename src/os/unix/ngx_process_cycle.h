@@ -31,6 +31,9 @@ typedef struct {
     ngx_event_handler_pt       handler;
     char                      *name;
     ngx_msec_t                 delay;
+#if (NGX_HTTP_LMDB_CACHE)
+    ngx_uint_t                 worker;
+#endif
 } ngx_cache_manager_ctx_t;
 
 

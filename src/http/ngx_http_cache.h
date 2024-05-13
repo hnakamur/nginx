@@ -156,6 +156,16 @@ typedef struct {
 } ngx_http_file_cache_sh_t;
 
 
+#if (NGX_HTTP_LMDB_CACHE)
+typedef struct {
+    ngx_queue_t                      submission_queue;
+    ngx_queue_t                     *completion_queues;
+    ngx_atomic_t                     cold;
+    ngx_atomic_t                     loading;
+} ngx_http_file_cache_queues_sh_t;
+#endif
+
+
 struct ngx_http_file_cache_s {
     ngx_http_file_cache_sh_t        *sh;
     ngx_slab_pool_t                 *shpool;
@@ -184,6 +194,13 @@ struct ngx_http_file_cache_s {
 
     ngx_uint_t                       use_temp_path;
                                      /* unsigned use_temp_path:1 */
+
+#if (NGX_HTTP_LMDB_CACHE)
+    ngx_http_file_cache_queues_sh_t  *queues_sh;
+    ngx_slab_pool_t                  *queues_shpool;
+    ngx_shm_zone_t                   *queues_shm_zone;
+    ngx_uint_t                        completion_queue_count;
+#endif
 };
 
 
