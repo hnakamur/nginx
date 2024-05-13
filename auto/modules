@@ -102,6 +102,11 @@ if [ $HTTP = YES ]; then
     fi
 
 
+    if [ $HTTP_LMDB_CACHE = YES ]; then
+        have=NGX_HTTP_LMDB_CACHE . auto/have
+    fi
+
+
     if [ $HTTP_V2 = YES -o $HTTP_V3 = YES ]; then
         HTTP_SRCS="$HTTP_SRCS $HTTP_HUFF_SRCS"
     fi

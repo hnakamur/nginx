@@ -172,6 +172,91 @@ ngx_http_file_cache_init(ngx_shm_zone_t *shm_zone, void *data)
 }
 
 
+#if (NGX_HTTP_LMDB_CACHE)
+static ngx_int_t
+ngx_http_file_cache_init_queues(ngx_shm_zone_t *shm_zone, void *data)
+{
+    ngx_http_file_cache_t  *ocache = data;
+
+    size_t                  len;
+    ngx_uint_t              n, i;
+    ngx_http_file_cache_t  *cache;
+
+    cache = shm_zone->data;
+
+    if (ocache && ocache->queues_sh) {
+        if (ngx_strcmp(cache->path->name.data, ocache->path->name.data) != 0) {
+            ngx_log_error(NGX_LOG_EMERG, shm_zone->shm.log, 0,
+                          "cache \"%V\" uses the \"%V\" cache path "
+                          "while previously it used the \"%V\" cache path",
+                          &shm_zone->shm.name, &cache->path->name,
+                          &ocache->path->name);
+
+            return NGX_ERROR;
+        }
+
+        for (n = 0; n < NGX_MAX_PATH_LEVEL; n++) {
+            if (cache->path->level[n] != ocache->path->level[n]) {
+                ngx_log_error(NGX_LOG_EMERG, shm_zone->shm.log, 0,
+                              "cache \"%V\" had previously different levels",
+                              &shm_zone->shm.name);
+                return NGX_ERROR;
+            }
+        }
+
+        cache->queues_sh = ocache->queues_sh;
+
+        cache->queues_shpool = ocache->queues_shpool;
+
+        return NGX_OK;
+    }
+
+    cache->queues_shpool = (ngx_slab_pool_t *) shm_zone->shm.addr;
+
+    if (shm_zone->shm.exists) {
+        cache->queues_sh = cache->shpool->data;
+
+        return NGX_OK;
+    }
+
+    cache->queues_sh = ngx_slab_alloc(cache->shpool,
+                                      sizeof(ngx_http_file_cache_sh_t));
+    if (cache->queues_sh == NULL) {
+        return NGX_ERROR;
+    }
+
+    cache->queues_shpool->data = cache->queues_sh;
+
+    ngx_queue_init(&cache->queues_sh->submission_queue);
+    cache->queues_sh->completion_queues = ngx_slab_alloc(cache->shpool,
+                          sizeof(ngx_queue_t) * cache->completion_queue_count);
+    if (cache->queues_sh->completion_queues == NULL) {
+        return NGX_ERROR;
+    }
+    for (i = 0; i < cache->completion_queue_count; i++) {
+        ngx_queue_init(&cache->queues_sh->completion_queues[i]);
+    }
+
+    cache->queues_sh->cold = 1;
+    cache->queues_sh->loading = 0;
+
+    len = sizeof(" in cache queues zone \"\"") + shm_zone->shm.name.len;
+
+    cache->queues_shpool->log_ctx = ngx_slab_alloc(cache->queues_shpool, len);
+    if (cache->queues_shpool->log_ctx == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_sprintf(cache->queues_shpool->log_ctx, " in cache queues zone \"%V\"%Z",
+                &shm_zone->shm.name);
+
+    cache->queues_shpool->log_nomem = 0;
+
+    return NGX_OK;
+}
+#endif
+
+
 ngx_int_t
 ngx_http_file_cache_new(ngx_http_request_t *r)
 {
@@ -2391,6 +2476,11 @@ ngx_http_file_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_uint_t              i, n, use_temp_path;
     ngx_array_t            *caches;
     ngx_http_file_cache_t  *cache, **ce;
+#if (NGX_HTTP_LMDB_CACHE)
+    ngx_core_conf_t        *ccf;
+    ssize_t                 queues_zone_size;
+    ngx_str_t               queues_zone_name;
+#endif
 
     cache = ngx_pcalloc(cf->pool, sizeof(ngx_http_file_cache_t));
     if (cache == NULL) {
@@ -2416,6 +2506,10 @@ ngx_http_file_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     name.len = 0;
     size = 0;
+#if (NGX_HTTP_LMDB_CACHE)
+    queues_zone_name.len = 0;
+    queues_zone_size = 0;
+#endif
     max_size = NGX_MAX_OFF_T_VALUE;
     min_free = 0;
 
@@ -2522,6 +2616,45 @@ ngx_http_file_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
             continue;
         }
+
+#if (NGX_HTTP_LMDB_CACHE)
+        if (ngx_strncmp(value[i].data, "queues_zone=", 12) == 0) {
+
+            queues_zone_name.data = value[i].data + 12;
+
+            p = (u_char *) ngx_strchr(queues_zone_name.data, ':');
+
+            if (p == NULL) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "invalid queues zone size \"%V\"",
+                                   &value[i]);
+                return NGX_CONF_ERROR;
+            }
+
+            queues_zone_name.len = p - queues_zone_name.data;
+
+            s.data = p + 1;
+            s.len = value[i].data + value[i].len - s.data;
+
+            queues_zone_size = ngx_parse_size(&s);
+
+            if (queues_zone_size == NGX_ERROR) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "invalid queues zone size \"%V\"",
+                                   &value[i]);
+                return NGX_CONF_ERROR;
+            }
+
+            if (queues_zone_size < (ssize_t) (2 * ngx_pagesize)) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "queues zone \"%V\" is too small",
+                                   &value[i]);
+                return NGX_CONF_ERROR;
+            }
+
+            continue;
+        }
+#endif
 
         if (ngx_strncmp(value[i].data, "inactive=", 9) == 0) {
 
@@ -2672,6 +2805,15 @@ ngx_http_file_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
+#if (NGX_HTTP_LMDB_CACHE)
+    if (queues_zone_name.len == 0 || queues_zone_size == 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "\"%V\" must have \"queues_zone\" parameter",
+                           &cmd->name);
+        return NGX_CONF_ERROR;
+    }
+#endif
+
     cache->path->manager = ngx_http_file_cache_manager;
     cache->path->loader = ngx_http_file_cache_loader;
     cache->path->data = cache;
@@ -2702,6 +2844,29 @@ ngx_http_file_cache_set_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     cache->shm_zone->init = ngx_http_file_cache_init;
     cache->shm_zone->data = cache;
+
+#if (NGX_HTTP_LMDB_CACHE)
+    cache->queues_shm_zone = ngx_shared_memory_add(cf, &queues_zone_name,
+                                                   queues_zone_size, cmd->post);
+    if (cache->queues_shm_zone == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (cache->queues_shm_zone->data) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "duplicate zone \"%V\"", &name);
+        return NGX_CONF_ERROR;
+    }
+
+
+    cache->queues_shm_zone->init = ngx_http_file_cache_init_queues;
+    cache->queues_shm_zone->data = cache;
+
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cf->cycle->conf_ctx,
+                                           ngx_core_module);
+    /* + 2 for manager and loader processes */
+    cache->completion_queue_count = ccf->worker_processes + 2;
+#endif
 
     cache->use_temp_path = use_temp_path;
 
