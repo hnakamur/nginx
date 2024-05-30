@@ -323,7 +323,7 @@ static ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
 
     { ngx_string("Age"),
                  ngx_http_upstream_process_age, 0,
-                 ngx_http_upstream_copy_header_line, 0, 0 },
+                 ngx_http_upstream_ignore_header_line, 0, 0 },
 
     { ngx_null_string, NULL, 0, NULL, 0, 0 }
 };
@@ -2980,6 +2980,7 @@ ngx_http_upstream_process_headers(ngx_http_request_t *r, ngx_http_upstream_t *u)
     r->headers_out.status_line = u->headers_in.status_line;
 
     r->headers_out.content_length_n = u->headers_in.content_length_n;
+    r->headers_out.age_n = u->headers_in.age_n;
 
     r->disable_not_modified = !u->cacheable;
 
