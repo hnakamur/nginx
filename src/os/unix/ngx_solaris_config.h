@@ -57,6 +57,8 @@
 
 #include <dlfcn.h>
 
+#include <sys/xattr.h>
+
 #define NGX_ALIGNMENT  _MAX_ALIGNMENT
 
 #include <ngx_auto_config.h>

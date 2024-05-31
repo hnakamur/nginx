@@ -51,6 +51,7 @@
 
 #include <dlfcn.h>
 
+#include <sys/xattr.h>
 
 #if __FreeBSD_version < 400017
 

@@ -269,4 +269,16 @@ off_t ngx_fs_available(u_char *name);
 #define ngx_set_stderr_n         "SetStdHandle(STD_ERROR_HANDLE)"
 
 
+#define NGX_HTTP_FILE_CACHE_XATTR_NAME "nginx_cache_age"
+
+ngx_int_t ngx_setxattr(u_char *path, u_char *name, void *value, size_t size,
+    ngx_int_t flags, ngx_log_t *log);
+
+#define ngx_setxattr_n           "ngx_setxattr_n"
+
+ngx_int_t ngx_getxattr(u_char *path, u_char *name, void *value, size_t size,
+    ngx_log_t *log);
+
+#define ngx_getxattr_n           "ngx_getxattr_n"
+
 #endif /* _NGX_FILES_H_INCLUDED_ */

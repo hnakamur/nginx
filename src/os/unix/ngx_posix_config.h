@@ -112,6 +112,7 @@
 #include <dlfcn.h>
 #endif
 
+#include <sys/xattr.h>
 
 #if (NGX_HAVE_POSIX_SEM)
 #include <semaphore.h>

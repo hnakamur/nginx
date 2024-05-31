@@ -53,6 +53,7 @@
 
 #include <dlfcn.h>
 
+#include <sys/xattr.h>
 
 #ifndef IOV_MAX
 #define IOV_MAX   64

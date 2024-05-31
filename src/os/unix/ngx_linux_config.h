@@ -57,6 +57,7 @@
 
 #include <dlfcn.h>
 
+#include <sys/xattr.h>
 
 #include <ngx_auto_config.h>
 

@@ -393,4 +393,17 @@ ssize_t ngx_thread_write_chain_to_file(ngx_file_t *file, ngx_chain_t *cl,
 #endif
 
 
+#define NGX_HTTP_FILE_CACHE_XATTR_NAME "user.nginx_cache_age"
+
+#define ngx_setxattr(path, name, value, size, flags, log)                    \
+    setxattr((const char *) path, (const char *) name, value, size, flags)
+
+#define ngx_setxattr_n           "setxattr()"
+
+#define ngx_getxattr(path, name, value, size, log)                           \
+    getxattr((const char *) path, (const char *) name, value, size)
+
+#define ngx_getxattr_n           "getxattr()"
+
+
 #endif /* _NGX_FILES_H_INCLUDED_ */

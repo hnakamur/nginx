@@ -18,6 +18,7 @@ static u_short *ngx_utf8_to_utf16(u_short *utf16, u_char *utf8, size_t *len,
     size_t reserved);
 static u_char *ngx_utf16_to_utf8(u_char *utf8, u_short *utf16, size_t *len,
     size_t *allocated);
+static u_char *make_full_stream_name(u_char *filename, u_char *stream_name);
 uint32_t ngx_utf16_decode(u_short **u, size_t n);
 
 
@@ -1456,4 +1457,107 @@ ngx_utf16_decode(u_short **u, size_t n)
     }
 
     return 0x10000 + ((k - 0xd800) << 10) + (m - 0xdc00);
+}
+
+
+static u_char *
+make_full_stream_name(u_char *filename, u_char *stream_name)
+{
+    size_t   filename_len, stream_name_len;
+    u_char  *full_stream_name, *p;
+
+    filename_len = strlen(filename);
+    stream_name_len = strlen(stream_name);
+    full_stream_name = malloc(filename_len + 1 + stream_name_len + 1);
+    if (full_stream_name == NULL) {
+        return NULL;
+    }
+    p = ngx_cpymem(full_stream_name, filename, filename_len);
+    *p++ = ':';
+    ngx_memcpy(p, (const void *) stream_name, stream_name_len + 1);
+    return full_stream_name;
+}
+
+
+ngx_int_t ngx_setxattr(u_char *path, u_char *name, void *value, size_t size,
+    ngx_int_t flags, ngx_log_t *log)
+{
+    u_char     *stream_name;
+    ssize_t     n;
+    ngx_fd_t    fd;
+    ngx_int_t   rc;
+
+    rc = NGX_OK;
+
+    stream_name = make_full_stream_name(path, name);
+
+    fd = ngx_open_file(stream_name, NGX_FILE_WRONLY, NGX_FILE_TRUNCATE, 0);
+
+    if (fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_CRIT, log, ngx_errno,
+                      ngx_open_file_n " \"%s\" failed", stream_name);
+        rc = NGX_ERROR;
+        goto exit;
+    }
+
+    n = ngx_write_fd(fd, value, size);
+    if (n != size) {
+        ngx_log_error(NGX_LOG_CRIT, log, ngx_errno,
+                      ngx_write_fd_n " \"%s\" failed, n=%d, size=%d",
+                      stream_name, n, size);
+        rc = NGX_ERROR;
+    }
+
+    if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
+                      ngx_close_file_n " %s failed", stream_name);
+        rc = NGX_ERROR;
+    }
+
+exit:
+    ngx_free(stream_name);
+    return rc;
+}
+
+
+ngx_int_t ngx_getxattr(u_char *path, u_char *name, void *value, size_t size,
+    ngx_log_t *log)
+{
+    u_char     *stream_name;
+    ssize_t     n;
+    ngx_fd_t    fd;
+    ngx_int_t   rc;
+
+    rc = NGX_OK;
+
+    stream_name = make_full_stream_name(path, name);
+
+    /* use NGX_FILE_CREATE_OR_OPEN to avoid filename to be checked */
+    fd = ngx_open_file(stream_name, NGX_FILE_RDONLY, NGX_FILE_CREATE_OR_OPEN,
+                       0);
+
+    if (fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_CRIT, log, ngx_errno,
+                      ngx_open_file_n " \"%s\" failed", stream_name);
+        rc = NGX_ERROR;
+        goto exit;
+    }
+
+    n = ngx_read_fd(fd, value, size);
+    if (n != size) {
+        ngx_log_error(NGX_LOG_CRIT, log, ngx_errno,
+                      ngx_read_fd_n " \"%s\" failed, n=%d, size=%d",
+                      stream_name, n, size);
+        rc = NGX_ERROR;
+    }
+
+    if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_ALERT, log, ngx_errno,
+                      ngx_close_file_n " %s failed", stream_name);
+        rc = NGX_ERROR;
+    }
+
+exit:
+    ngx_free(stream_name);
+    return rc;
 }

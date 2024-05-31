@@ -11,6 +11,21 @@
 #include <ngx_md5.h>
 
 
+#define NGX_HTTP_FILE_CACHE_XATTR_VERSION 1
+
+
+typedef struct {
+    uint64_t  version;
+    time_t    response_time;
+    time_t    corrected_initial_age;
+} ngx_http_file_cache_xattr_t;
+
+
+static ngx_int_t ngx_http_file_cache_set_xattr(ngx_http_request_t *r,
+    ngx_http_cache_t *c, ngx_file_t *file);
+static ngx_int_t ngx_http_file_cache_get_xattr(ngx_http_request_t *r,
+    ngx_http_cache_t *c, ngx_file_t *file);
+
 static ngx_int_t ngx_http_file_cache_lock(ngx_http_request_t *r,
     ngx_http_cache_t *c);
 static void ngx_http_file_cache_lock_wait_handler(ngx_event_t *ev);
@@ -627,6 +642,10 @@ ngx_http_file_cache_read(ngx_http_request_t *r, ngx_http_cache_t *c)
     c->body_start = h->body_start;
     c->etag.len = h->etag_len;
     c->etag.data = h->etag;
+
+    if (ngx_http_file_cache_get_xattr(r, c, &c->file) != NGX_OK) {
+        return NGX_DECLINED;
+    }
 
     r->cached = 1;
 
@@ -1473,6 +1492,10 @@ ngx_http_file_cache_update(ngx_http_request_t *r, ngx_temp_file_t *tf)
         }
     }
 
+    if (ngx_http_file_cache_set_xattr(r, c, &c->file) != NGX_OK) {
+        rc = NGX_ERROR;
+    }
+
     ngx_shmtx_lock(&cache->shpool->mutex);
 
     c->node->count--;
@@ -1615,6 +1638,8 @@ ngx_http_file_cache_update_header(ngx_http_request_t *r)
 
     (void) ngx_write_file(&file, (u_char *) &h,
                           sizeof(ngx_http_file_cache_header_t), 0);
+
+    (void) ngx_http_file_cache_set_xattr(r, c, &file);
 
 done:
 
@@ -2812,4 +2837,89 @@ ngx_http_file_cache_valid_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
     }
 
     return NGX_CONF_OK;
+}
+
+
+#if (NGX_WIN32)
+static ngx_int_t
+ngx_http_file_cache_stream_name(ngx_http_request_t *r, ngx_str_t *filename,
+    ngx_str_t *stream_name)
+{
+    u_char  *p;
+
+    stream_name->len = filename->len + 1 +
+        sizeof(NGX_HTTP_FILE_CACHE_XATTR_NAME);
+    stream_name->data = ngx_palloc(r->pool, stream_name->len);
+    if (stream_name->data == NULL) {
+        return NGX_ERROR;
+    }
+    p = ngx_cpymem(stream_name->data, filename->data, filename->len);
+    *p++ = ':';
+    ngx_memcpy(p, (const void *) NGX_HTTP_FILE_CACHE_XATTR_NAME,
+               sizeof(NGX_HTTP_FILE_CACHE_XATTR_NAME));
+    return NGX_OK;
+}
+#endif
+
+
+static ngx_int_t
+ngx_http_file_cache_set_xattr(ngx_http_request_t *r, ngx_http_cache_t *c,
+    ngx_file_t *file)
+{
+    ngx_http_file_cache_xattr_t  attr;
+
+    ngx_log_debug3(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http file cache set xattr, file=\"%s\", "
+                   "response_time=%d, corrected_initial_age=%d",
+                   file->name.data, c->response_time, c->corrected_initial_age);
+
+    attr.version = NGX_HTTP_FILE_CACHE_XATTR_VERSION;
+    attr.response_time = c->response_time;
+    attr.corrected_initial_age = c->corrected_initial_age;
+
+    if (ngx_setxattr((u_char *) file->name.data,
+                     (u_char *) NGX_HTTP_FILE_CACHE_XATTR_NAME,
+                     &attr, sizeof(attr), 0, r->connection->log) < 0)
+    {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, ngx_errno,
+                      "setxattr" " \"%s\" failed", file->name.data);
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_file_cache_get_xattr(ngx_http_request_t *r, ngx_http_cache_t *c,
+    ngx_file_t *file)
+{
+    ngx_http_file_cache_xattr_t  attr;
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http file cache get xattr, file=\"%s\"", file->name.data);
+
+    if (ngx_getxattr((u_char *) file->name.data,
+                     (u_char *) NGX_HTTP_FILE_CACHE_XATTR_NAME,
+                     &attr, sizeof(attr), r->connection->log) < 0)
+    {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, ngx_errno,
+                      "getxattr" " \"%s\" failed", file->name.data);
+        return NGX_ERROR;
+    }
+
+    if (attr.version != NGX_HTTP_FILE_CACHE_XATTR_VERSION) {
+        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                      "cache xattr \"%s\" version mismatch", file->name.data);
+        return NGX_DECLINED;
+    }
+
+    ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "http file cache get xattr result, "
+                   "response_time=%d, corrected_initial_age=%d",
+                   attr.response_time, attr.corrected_initial_age);
+
+    c->response_time = attr.response_time;
+    c->corrected_initial_age = attr.corrected_initial_age;
+    return NGX_OK;
 }
