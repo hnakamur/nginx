@@ -2981,6 +2981,8 @@ ngx_http_upstream_process_headers(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     r->headers_out.content_length_n = u->headers_in.content_length_n;
     r->headers_out.age_n = u->headers_in.age_n;
+ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+              "upstream_process_headers age:%O", r->headers_out.age_n);
 
     r->disable_not_modified = !u->cacheable;
 
@@ -5369,6 +5371,9 @@ ngx_http_upstream_process_age(ngx_http_request_t *r,
     h->next = NULL;
     u->headers_in.age = h;
     u->headers_in.age_n = ngx_atoof(h->value.data, h->value.len);
+
+ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0, "upstream_process_age:%O",
+              u->headers_in.age_n);
 
     if (u->headers_in.age_n == NGX_ERROR) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,

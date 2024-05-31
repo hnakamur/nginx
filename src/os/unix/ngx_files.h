@@ -392,5 +392,12 @@ ssize_t ngx_thread_write_chain_to_file(ngx_file_t *file, ngx_chain_t *cl,
     off_t offset, ngx_pool_t *pool);
 #endif
 
+#define ngx_fsetxattr(fd, path, name, value, size)                            \
+    fsetxattr(fd, (const char *) name, value, size, 0)
+#define ngx_fsetxattr_n  "fsetxattr()"
+
+#define ngx_fgetxattr(fd, path, name, value, size)                            \
+    fgetxattr(fd, (const char *) name, value, size)
+#define ngx_gsetxattr_n  "gsetxattr()"
 
 #endif /* _NGX_FILES_H_INCLUDED_ */

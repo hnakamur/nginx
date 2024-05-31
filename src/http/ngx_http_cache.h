@@ -191,6 +191,17 @@ struct ngx_http_file_cache_s {
 };
 
 
+#define NGX_HTTP_CACHE_XATTR_NAME    "user.nginx_cache"
+#define NGX_HTTP_CACHE_XATTR_VERSION 1
+
+
+typedef struct {
+    uint64_t                         version;
+    off_t                            corrected_initial_age;
+    time_t                           response_time;
+} ngx_http_file_cache_xattr_t;
+
+
 ngx_int_t ngx_http_file_cache_new(ngx_http_request_t *r);
 ngx_int_t ngx_http_file_cache_create(ngx_http_request_t *r);
 void ngx_http_file_cache_create_key(ngx_http_request_t *r);

@@ -1418,6 +1418,28 @@ ngx_http_file_cache_update_variant(ngx_http_request_t *r, ngx_http_cache_t *c)
 }
 
 
+static ngx_int_t
+ngx_http_file_cache_setxattr(ngx_http_request_t *r, ngx_fd_t fd,
+    const u_char *path)
+{
+    ngx_int_t                     rc;
+    ngx_http_cache_t             *c;
+    ngx_http_file_cache_xattr_t   attr;
+
+    c = r->cache;
+    attr.version = NGX_HTTP_CACHE_XATTR_VERSION;
+    attr.corrected_initial_age = c->corrected_initial_age;
+    attr.response_time = c->response_time;
+    rc = ngx_fsetxattr(fd, path, NGX_HTTP_CACHE_XATTR_NAME, &attr,
+                       sizeof(attr));
+    if (rc != NGX_OK) {
+        ngx_log_error(NGX_LOG_CRIT, r->connection->log, ngx_errno,
+                      ngx_fsetxattr_n " \"%s\" failed", path);
+    }
+    return rc;
+}
+
+
 void
 ngx_http_file_cache_update(ngx_http_request_t *r, ngx_temp_file_t *tf)
 {
@@ -1456,6 +1478,8 @@ ngx_http_file_cache_update(ngx_http_request_t *r, ngx_temp_file_t *tf)
     ext.create_path = 1;
     ext.delete_file = 1;
     ext.log = r->connection->log;
+
+    (void) ngx_http_file_cache_setxattr(r, tf->file.fd, tf->file.name.data);
 
     rc = ngx_ext_rename_file(&tf->file.name, &c->file.name, &ext);
 
@@ -1616,6 +1640,8 @@ ngx_http_file_cache_update_header(ngx_http_request_t *r)
         ngx_memcpy(h.variant, c->variant, NGX_HTTP_CACHE_KEY_LEN);
     }
 
+    (void) ngx_http_file_cache_setxattr(r, file.fd, file.name.data);
+
     (void) ngx_write_file(&file, (u_char *) &h,
                           sizeof(ngx_http_file_cache_header_t), 0);
 
@@ -1657,6 +1683,8 @@ ngx_http_cache_send(ngx_http_request_t *r)
     resident_time = ngx_time() - c->response_time;
     current_age = c->corrected_initial_age + resident_time;
     r->headers_out.age_n = current_age;
+ngx_log_error(NGX_LOG_NOTICE, r->connection->log, 0,
+              "http_cache_send age:%O", r->headers_out.age_n);
 
     rc = ngx_http_send_header(r);
 

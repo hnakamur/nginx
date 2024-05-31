@@ -269,4 +269,12 @@ off_t ngx_fs_available(u_char *name);
 #define ngx_set_stderr_n         "SetStdHandle(STD_ERROR_HANDLE)"
 
 
+ngx_int_t ngx_fsetxattr(ngx_fd_t fd, const u_char *path, const u_char *name,
+    const void *value, size_t size);
+#define ngx_fsetxattr_n  "ngx_fsetxattr_n"
+
+ssize_t ngx_fgetxattr(ngx_fd_t fd, const u_char *path, const u_char *name,
+    void *value, size_t size);
+#define ngx_fgetxattr_n  "ngx_fgetxattr_n"
+
 #endif /* _NGX_FILES_H_INCLUDED_ */

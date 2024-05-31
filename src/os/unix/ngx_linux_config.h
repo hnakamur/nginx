@@ -55,6 +55,8 @@
 #include <crypt.h>
 #include <sys/utsname.h>        /* uname() */
 
+#include <sys/xattr.h>          /* fsetxattr, fgetxattr */
+
 #include <dlfcn.h>
 
 

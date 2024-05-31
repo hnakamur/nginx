@@ -1457,3 +1457,87 @@ ngx_utf16_decode(u_short **u, size_t n)
 
     return 0x10000 + ((k - 0xd800) << 10) + (m - 0xdc00);
 }
+
+
+static u_char *
+make_stream_name(const u_char *path, const u_char *name)
+{
+    u_char  *stname, *p;
+
+    stname = malloc(ngx_strlen(paht) + 1 + ngx_strlen(name) + 1);
+    if (stname == NULL) {
+        ngx_set_errno(NGX_ENOMEM);
+        return NULL;
+    }
+
+    p = ngx_cpymem(stname, path, ngx_strlen(path));
+    *p++ = ':';
+    ngx_memcpy(p, name, ngx_strlen(name) + 1);
+    return stname;
+}
+
+
+ngx_int_t
+ngx_fsetxattr(ngx_fd_t fd, const u_char *path, const u_char *name,
+    const void *value, size_t size)
+{
+    u_char     *stname;
+    ssize_t     n;
+    ngx_int_t   rc = NGX_OK;
+
+    stname = make_stream_name(path, name);
+    if (stname == NULL) {
+        return NGX_ERROR;
+    }
+
+    fd = ngx_open_file(stname, NGX_FILE_WRONLY, NGX_FILE_CREATE_OR_OPEN,
+                       NGX_FILE_DEFAULT_ACCESS);
+    if (fd == NGX_INVALID_FILE) {
+        rc = NGX_ERROR;
+        goto error;
+    }
+
+    n = ngx_write_fd(fd, value, size);
+    if (n != size) {
+        rc = NGX_ERROR;
+    }
+
+    if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+        rc = NGX_ERROR;
+    }
+
+error:
+    free(stname);
+    return rc;
+}
+
+
+ssize_t
+ngx_fgetxattr(ngx_fd_t fd, const u_char *path, const u_char *name,
+    void *value, size_t size)
+{
+    u_char     *stname;
+    ssize_t     n = NGX_OK;
+
+    stname = make_stream_name(path, name);
+    if (stname == NULL) {
+        return NGX_ERROR;
+    }
+
+    fd = ngx_open_file(stname, NGX_FILE_WRONLY, NGX_FILE_CREATE_OR_OPEN,
+                       NGX_FILE_DEFAULT_ACCESS);
+    if (fd == NGX_INVALID_FILE) {
+        rc = NGX_ERROR;
+        goto error;
+    }
+
+    n = ngx_read_fd(fd, value, size);
+
+    if (ngx_close_file(fd) == NGX_FILE_ERROR && n == size) {
+        n = NGX_ERROR;
+    }
+
+error:
+    free(stname);
+    return n;
+}

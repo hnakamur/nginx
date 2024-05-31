@@ -51,6 +51,8 @@
 #include <sys/sysctl.h>
 #include <xlocale.h>
 
+#include <sys/xattr.h>          /* fsetxattr, fgetxattr */
+
 #include <dlfcn.h>
 
 

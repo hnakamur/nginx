@@ -214,6 +214,9 @@ ngx_http_v3_header_filter(ngx_http_request_t *r)
                                   sizeof("Mon, 28 Sep 1970 06:00:00 GMT") - 1);
     }
 
+ngx_log_error(NGX_LOG_NOTICE, c->log, 0, "http3 header age:%O",
+              r->headers_out.age_n);
+
     if (r->headers_out.age_n > 0) {
         len += ngx_http_v3_encode_field_lri(NULL, 0,
                                             NGX_HTTP_V3_HEADER_AGE_ZERO,
@@ -421,6 +424,9 @@ ngx_http_v3_header_filter(ngx_http_request_t *r)
     if (r->headers_out.content_length == NULL
         && r->headers_out.content_length_n >= 0)
     {
+ngx_log_error(NGX_LOG_NOTICE, c->log, 0,
+              "http3 output header: \"content-length: %O\"",
+              r->headers_out.content_length_n);
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
                        "http3 output header: \"content-length: %O\"",
                        r->headers_out.content_length_n);

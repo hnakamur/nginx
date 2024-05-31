@@ -49,6 +49,8 @@
 #include <osreldate.h>
 #include <sys/sysctl.h>
 
+#include <sys/xattr.h>          /* fsetxattr, fgetxattr */
+
 #include <dlfcn.h>
 
 
