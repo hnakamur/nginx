@@ -149,6 +149,13 @@ typedef struct {
     unsigned                           proxy_protocol:1;
     unsigned                           half_closed:1;
     unsigned                           blocked:1;
+
+    /*
+     * instead of using the context data in
+     * ngx_stream_limit_upstream_module
+     * we use the bit fields in the upstream structure
+     */
+    unsigned                          limit_upstream_status:3;
 } ngx_stream_upstream_t;
 
 
