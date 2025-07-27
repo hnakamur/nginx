@@ -409,6 +409,13 @@ struct ngx_http_upstream_s {
     unsigned                         request_body_blocked:1;
     unsigned                         header_sent:1;
     unsigned                         blocked:1;
+
+    /*
+     * instead of using the context data in
+     * ngx_http_limit_upstream_module
+     * we use the bit fields in the upstream structure
+     */
+    unsigned                          limit_upstream_status:3;
 };
 
 
