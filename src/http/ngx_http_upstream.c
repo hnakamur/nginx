@@ -35,8 +35,6 @@ static void ngx_http_upstream_rd_check_broken_connection(ngx_http_request_t *r);
 static void ngx_http_upstream_wr_check_broken_connection(ngx_http_request_t *r);
 static void ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
     ngx_event_t *ev);
-static void ngx_http_upstream_connect(ngx_http_request_t *r,
-    ngx_http_upstream_t *u);
 static ngx_int_t ngx_http_upstream_reinit(ngx_http_request_t *r,
     ngx_http_upstream_t *u);
 static void ngx_http_upstream_send_request(ngx_http_request_t *r,
@@ -1546,38 +1544,44 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
 }
 
 
-static void
+void
 ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
 {
     ngx_int_t                  rc;
     ngx_connection_t          *c;
     ngx_http_core_loc_conf_t  *clcf;
 
-    r->connection->log->action = "connecting to upstream";
+    if (!u->blocked) {
+        r->connection->log->action = "connecting to upstream";
 
-    if (u->state && u->state->response_time == (ngx_msec_t) -1) {
-        u->state->response_time = ngx_current_msec - u->start_time;
+        if (u->state && u->state->response_time == (ngx_msec_t) -1) {
+            u->state->response_time = ngx_current_msec - u->start_time;
+        }
+
+        u->state = ngx_array_push(r->upstream_states);
+        if (u->state == NULL) {
+            ngx_http_upstream_finalize_request(r, u,
+                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+            return;
+        }
+
+        ngx_memzero(u->state, sizeof(ngx_http_upstream_state_t));
+
+        u->start_time = ngx_current_msec;
+
+        u->state->response_time = (ngx_msec_t) -1;
+        u->state->connect_time = (ngx_msec_t) -1;
+        u->state->header_time = (ngx_msec_t) -1;
     }
-
-    u->state = ngx_array_push(r->upstream_states);
-    if (u->state == NULL) {
-        ngx_http_upstream_finalize_request(r, u,
-                                           NGX_HTTP_INTERNAL_SERVER_ERROR);
-        return;
-    }
-
-    ngx_memzero(u->state, sizeof(ngx_http_upstream_state_t));
-
-    u->start_time = ngx_current_msec;
-
-    u->state->response_time = (ngx_msec_t) -1;
-    u->state->connect_time = (ngx_msec_t) -1;
-    u->state->header_time = (ngx_msec_t) -1;
 
     rc = ngx_event_connect_peer(&u->peer);
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "http upstream connect: %i", rc);
+
+    if (rc == NGX_BLOCK) {
+        return;
+    }
 
     if (rc == NGX_ERROR) {
         ngx_http_upstream_finalize_request(r, u,

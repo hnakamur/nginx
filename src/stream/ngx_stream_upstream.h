@@ -148,6 +148,7 @@ typedef struct {
     unsigned                           connected:1;
     unsigned                           proxy_protocol:1;
     unsigned                           half_closed:1;
+    unsigned                           blocked:1;
 } ngx_stream_upstream_t;
 
 
