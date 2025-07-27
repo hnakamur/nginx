@@ -66,7 +66,7 @@ static ngx_int_t ngx_stream_proxy_eval(ngx_stream_session_t *s,
     ngx_stream_proxy_srv_conf_t *pscf);
 static ngx_int_t ngx_stream_proxy_set_local(ngx_stream_session_t *s,
     ngx_stream_upstream_t *u, ngx_stream_upstream_local_t *local);
-static void ngx_stream_proxy_connect(ngx_stream_session_t *s);
+void ngx_stream_proxy_connect(ngx_stream_session_t *s);
 static void ngx_stream_proxy_init_upstream(ngx_stream_session_t *s);
 static void ngx_stream_proxy_resolve_handler(ngx_resolver_ctx_t *ctx);
 static void ngx_stream_proxy_upstream_handler(ngx_event_t *ev);
@@ -80,7 +80,7 @@ static void ngx_stream_proxy_process(ngx_stream_session_t *s,
 static ngx_int_t ngx_stream_proxy_test_finalize(ngx_stream_session_t *s,
     ngx_uint_t from_upstream);
 static void ngx_stream_proxy_next_upstream(ngx_stream_session_t *s);
-static void ngx_stream_proxy_finalize(ngx_stream_session_t *s, ngx_uint_t rc);
+void ngx_stream_proxy_finalize(ngx_stream_session_t *s, ngx_uint_t rc);
 static u_char *ngx_stream_proxy_log_error(ngx_log_t *log, u_char *buf,
     size_t len);
 
@@ -706,7 +706,7 @@ ngx_stream_proxy_set_local(ngx_stream_session_t *s, ngx_stream_upstream_t *u,
 }
 
 
-static void
+void
 ngx_stream_proxy_connect(ngx_stream_session_t *s)
 {
     ngx_int_t                     rc;
@@ -722,30 +722,36 @@ ngx_stream_proxy_connect(ngx_stream_session_t *s)
 
     u = s->upstream;
 
-    u->connected = 0;
-    u->proxy_protocol = pscf->proxy_protocol;
+    if (!u->blocked) {
+        u->connected = 0;
+        u->proxy_protocol = pscf->proxy_protocol;
 
-    if (u->state) {
-        u->state->response_time = ngx_current_msec - u->start_time;
+        if (u->state) {
+            u->state->response_time = ngx_current_msec - u->start_time;
+        }
+
+        u->state = ngx_array_push(s->upstream_states);
+        if (u->state == NULL) {
+            ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
+            return;
+        }
+
+        ngx_memzero(u->state, sizeof(ngx_stream_upstream_state_t));
+
+        u->start_time = ngx_current_msec;
+
+        u->state->connect_time = (ngx_msec_t) -1;
+        u->state->first_byte_time = (ngx_msec_t) -1;
+        u->state->response_time = (ngx_msec_t) -1;
     }
-
-    u->state = ngx_array_push(s->upstream_states);
-    if (u->state == NULL) {
-        ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
-        return;
-    }
-
-    ngx_memzero(u->state, sizeof(ngx_stream_upstream_state_t));
-
-    u->start_time = ngx_current_msec;
-
-    u->state->connect_time = (ngx_msec_t) -1;
-    u->state->first_byte_time = (ngx_msec_t) -1;
-    u->state->response_time = (ngx_msec_t) -1;
 
     rc = ngx_event_connect_peer(&u->peer);
 
     ngx_log_debug1(NGX_LOG_DEBUG_STREAM, c->log, 0, "proxy connect: %i", rc);
+
+    if (rc == NGX_BLOCK) {
+        return;
+    }
 
     if (rc == NGX_ERROR) {
         ngx_stream_proxy_finalize(s, NGX_STREAM_INTERNAL_SERVER_ERROR);
@@ -2015,7 +2021,7 @@ ngx_stream_proxy_test_finalize(ngx_stream_session_t *s,
 }
 
 
-static void
+void
 ngx_stream_proxy_next_upstream(ngx_stream_session_t *s)
 {
     ngx_msec_t                    timeout;
@@ -2081,7 +2087,7 @@ ngx_stream_proxy_next_upstream(ngx_stream_session_t *s)
 }
 
 
-static void
+void
 ngx_stream_proxy_finalize(ngx_stream_session_t *s, ngx_uint_t rc)
 {
     ngx_uint_t              state;
