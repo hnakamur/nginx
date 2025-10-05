@@ -144,6 +144,17 @@ struct ngx_ssl_connection_s {
     unsigned                    early_preread:1;
     unsigned                    write_blocked:1;
     unsigned                    sni_accepted:1;
+
+    ngx_str_t                   fp_ja3_data;
+    ngx_str_t                   fp_ja3_str;
+    ngx_str_t                   fp_ja3_hash;
+    uint16_t                    fp_tls_greased;
+
+    ngx_str_t                   fp_ja4_data;
+    ngx_str_t                   fp_ja4_r;
+    ngx_str_t                   fp_ja4;
+    ngx_str_t                   fp_ja4_ro;
+    ngx_str_t                   fp_ja4_o;
 };
 
 
