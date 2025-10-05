@@ -151,6 +151,11 @@ struct ngx_ssl_connection_s {
     unsigned                    in_ocsp:1;
     unsigned                    early_preread:1;
     unsigned                    write_blocked:1;
+
+    ngx_str_t                   fp_ja3_data;
+    ngx_str_t                   fp_ja3_str;
+    ngx_str_t                   fp_ja3_hash;
+    uint16_t                    fp_tls_greased;
 };
 
 
