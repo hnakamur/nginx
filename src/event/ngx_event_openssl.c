@@ -10,6 +10,7 @@
 #include <ngx_event.h>
 
 
+#define NGX_SSL_JA3_BUFFER_SIZE 256 /* = (sizeof(uint16_t) * 128) */
 #define NGX_SSL_PASSWORD_BUFFER_SIZE  4096
 
 
@@ -1701,6 +1702,40 @@ ngx_ssl_set_session(ngx_connection_t *c, ngx_ssl_session_t *session)
     return NGX_OK;
 }
 
+int
+ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
+{
+    ngx_connection_t  *c = arg;
+    ngx_str_t         *ja;
+
+    if (c == NULL) {
+        return SSL_CLIENT_HELLO_SUCCESS;
+    }
+
+    if (c->ssl == NULL) {
+        return SSL_CLIENT_HELLO_SUCCESS;
+    }
+
+    ja = &c->ssl->fp_ja3_data;
+    ja->len = NGX_SSL_JA3_BUFFER_SIZE;
+
+    ja->data = ngx_pnalloc(c->pool, c->ssl->fp_ja3_data.len);
+    if (ja->data == NULL) {
+        ja->len = 0;
+        return SSL_CLIENT_HELLO_SUCCESS;
+    }
+
+    ja->len = SSL_client_hello_get_ja3_data(c->ssl->connection, ja->data,
+            NGX_SSL_JA3_BUFFER_SIZE);
+    if (ja->len == 0) {
+        ngx_log_error(NGX_LOG_WARN, c->log, 0, "SSL_client_hello_get_ja3_data "
+                "seems the buffer size is less that number of fileds; "
+                "for this SSL connection can't get a ja3 hash string");
+        ja->data = NULL;
+    }
+
+    return SSL_CLIENT_HELLO_SUCCESS;
+}
 
 ngx_int_t
 ngx_ssl_handshake(ngx_connection_t *c)
@@ -1720,6 +1755,9 @@ ngx_ssl_handshake(ngx_connection_t *c)
     }
 
     ngx_ssl_clear_error(c->log);
+
+    (void) SSL_CTX_set_client_hello_cb(c->ssl->session_ctx,
+                                ngx_ssl_client_hello_ja3_cb, c);
 
     n = SSL_do_handshake(c->ssl->connection);
 

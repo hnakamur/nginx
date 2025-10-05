@@ -306,6 +306,8 @@ ngx_http_v2_init(ngx_event_t *rev)
         ngx_add_timer(rev, cscf->client_header_timeout);
     }
 
+    h2c->fp_fingerprinted = 0;
+
     c->idle = 1;
     ngx_reusable_connection(c, 0);
 
@@ -1357,6 +1359,14 @@ ngx_http_v2_state_headers(ngx_http_v2_connection_t *h2c, u_char *pos,
         }
     }
 
+    if (!h2c->fp_fingerprinted && h2c->fp_priorities.len < 32) {
+        h2c->fp_priorities.data[h2c->fp_priorities.len] = (uint8_t)stream->node->id;
+        h2c->fp_priorities.data[h2c->fp_priorities.len+1] = (uint8_t)excl;
+        h2c->fp_priorities.data[h2c->fp_priorities.len+2] = (uint8_t)depend;
+        h2c->fp_priorities.data[h2c->fp_priorities.len+3] = (uint8_t)(weight-1);
+        h2c->fp_priorities.len += 4;
+    }
+
     return ngx_http_v2_state_header_block(h2c, pos, end);
 
 rst_stream:
@@ -1780,6 +1790,9 @@ ngx_http_v2_state_process_header(ngx_http_v2_connection_t *h2c, u_char *pos,
     }
 
     if (header->name.data[0] == ':') {
+        if (!h2c->fp_fingerprinted && h2c->fp_pseudoheaders.len < 32 && header->name.len > 1)
+            h2c->fp_pseudoheaders.data[h2c->fp_pseudoheaders.len++] = header->name.data[1];
+
         rc = ngx_http_v2_pseudo_header(r, header);
 
         if (rc == NGX_OK) {
@@ -2199,6 +2212,12 @@ ngx_http_v2_state_settings_params(ngx_http_v2_connection_t *h2c, u_char *pos,
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, h2c->connection->log, 0,
                        "http2 setting %ui:%ui", id, value);
 
+        if (!h2c->fp_fingerprinted && h2c->fp_settings.len < 32) {
+            h2c->fp_settings.data[h2c->fp_settings.len] = (uint8_t)id;
+            *(uint32_t*)(h2c->fp_settings.data + h2c->fp_settings.len + 1)  = (uint32_t)value;
+            h2c->fp_settings.len += 5;
+        }
+
         switch (id) {
 
         case NGX_HTTP_V2_INIT_WINDOW_SIZE_SETTING:
@@ -2483,6 +2502,9 @@ ngx_http_v2_state_window_update(ngx_http_v2_connection_t *h2c, u_char *pos,
     }
 
     h2c->send_window += window;
+    if (!h2c->fp_fingerprinted) {
+        h2c->fp_windowupdate = window;
+    }
 
     while (!ngx_queue_empty(&h2c->waiting)) {
         q = ngx_queue_head(&h2c->waiting);
