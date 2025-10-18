@@ -1898,6 +1898,96 @@ ngx_ssl_set_session(ngx_connection_t *c, ngx_ssl_session_t *session)
     return NGX_OK;
 }
 
+
+size_t SSL_client_hello_get_ja3_data(SSL *s, unsigned char *data,
+        size_t data_size)
+{
+    const unsigned char *ciphers, *groups, *formats;
+    size_t ciphers_len = 0, num_exts = 0, groups_len = 0, formats_len = 0, i;
+    int *exts;
+    unsigned char *ptr = data,
+                  *end = data + data_size;
+
+    if (data == NULL
+        /** just checking that we have at least this */
+        || data_size < 128)
+        return 0;
+
+    /* version */
+    *(uint16_t *) ptr = (uint16_t) SSL_client_hello_get0_legacy_version(s);
+    ptr += sizeof(uint16_t);
+
+    /* ciphers */
+    ciphers_len = SSL_client_hello_get0_ciphers(s, &ciphers);
+    if (ciphers_len > 0) {
+        *(uint16_t *) ptr = (uint16_t) ciphers_len;
+        ptr += sizeof(uint16_t);
+
+        if (ptr + ciphers_len > end)
+            return 0;
+
+        memcpy(ptr, ciphers, ciphers_len);
+        ptr += ciphers_len;
+    }
+
+    /* extensions */
+    if (SSL_client_hello_get1_extensions_present(s, &exts, &num_exts)) {
+        if ((ptr + sizeof(uint16_t) + num_exts * sizeof(uint16_t)) > end) {
+            OPENSSL_free(exts);
+            return 0;
+        }
+
+        *(uint16_t*) ptr = (uint16_t) num_exts * sizeof(uint16_t);
+        ptr += sizeof(uint16_t);
+
+        for (i = 0; i < num_exts; i++) {
+            if (exts[i] == TLSEXT_TYPE_supported_groups) {
+                SSL_client_hello_get0_ext(s, TLSEXT_TYPE_supported_groups,
+                                          &groups, &groups_len);
+            } else if (exts[i] == TLSEXT_TYPE_ec_point_formats) {
+                SSL_client_hello_get0_ext(s, TLSEXT_TYPE_ec_point_formats,
+                                          &formats, &formats_len);
+            }
+            ((uint16_t*)(ptr))[i] = (uint16_t) exts[i];
+        }
+
+        OPENSSL_free(exts);
+    }
+
+    ptr += num_exts * sizeof(uint16_t);
+
+    /* groups */
+    if (groups_len > 0) {
+        if ((ptr + sizeof(uint16_t) + groups_len) > end)
+            return 0;
+        memcpy(ptr, groups, groups_len);
+        *(uint16_t*) ptr = (uint16_t) groups_len;
+        ptr += groups_len;
+    } else {
+        if (ptr + sizeof(uint16_t) > end)
+            return 0;
+        *(uint16_t *) ptr = (uint16_t) 0;
+        ptr += sizeof(uint16_t);
+    }
+
+    /* formats */
+    if (formats_len > 0) {
+        if ((ptr + sizeof(uint8_t) + formats_len) > end)
+            return 0;
+        memcpy(ptr, formats, formats_len);
+        *(uint8_t *) ptr = (uint8_t) formats_len;
+        ptr += formats_len;
+    } else {
+        if (ptr + sizeof(uint8_t) > end)
+            return 0;
+        *(uint8_t *) ptr = (uint8_t) 0;
+        ptr += sizeof(uint8_t);
+    }
+
+    return ptr - data;
+}
+
+
 int
 ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
 {

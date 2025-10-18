@@ -15,6 +15,7 @@
 #define OPENSSL_SUPPRESS_DEPRECATED
 
 #include <openssl/ssl.h>
+#include <openssl/tls1.h>
 #include <openssl/err.h>
 #include <openssl/bn.h>
 #include <openssl/conf.h>
