@@ -15,7 +15,6 @@
 #define OPENSSL_SUPPRESS_DEPRECATED
 
 #include <openssl/ssl.h>
-#include <openssl/tls1.h>
 #include <openssl/err.h>
 #include <openssl/bn.h>
 #include <openssl/conf.h>
@@ -150,6 +149,10 @@ struct ngx_ssl_connection_s {
     ngx_str_t                   fp_ja3_str;
     ngx_str_t                   fp_ja3_hash;
     uint16_t                    fp_tls_greased;
+
+    ngx_str_t                   fp_ja4_data;
+    ngx_str_t                   fp_ja4_str;
+    ngx_str_t                   fp_ja4_hash;
 };
 
 
