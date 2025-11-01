@@ -1902,7 +1902,7 @@ ngx_ssl_set_session(ngx_connection_t *c, ngx_ssl_session_t *session)
                               && ((code) & 0xff) == ((code) >> 8))
 
 int
-ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
+ngx_ssl_client_hello_ja4_cb(SSL *s, int *al, void *arg)
 {
     ngx_connection_t     *c = arg;
     ngx_str_t            *ja;
@@ -1931,7 +1931,7 @@ ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
     SSL_client_hello_get0_ext(s, TLSEXT_TYPE_ec_point_formats, &formats,
                               &formats_len);
     ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                    "SSL_client_hello_get_ja3_data "
+                    "ngx_ssl_client_hello_ja4_cb "
                     "ciphers_len=%d, num_exts=%d, exts_len=%d",
                     ciphers_len, num_exts, exts_len);
 
@@ -1947,7 +1947,7 @@ ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
 
     ja->data = ngx_pnalloc(c->pool, ja->len);
     if (ja->data == NULL) {
-        ngx_log_error(NGX_LOG_WARN, c->log, 0, "SSL_client_hello_get_ja3_data "
+        ngx_log_error(NGX_LOG_ERR, c->log, 0, "ngx_ssl_client_hello_ja4_cb "
                 "out of memory for fp_ja3_data");
         ja->len = 0;
         goto failed;
@@ -2004,7 +2004,7 @@ ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
     }
 
     if (ptr != ja->data + ja->len) {
-        ngx_log_error(NGX_LOG_WARN, c->log, 0, "SSL_client_hello_get_ja3_data "
+        ngx_log_error(NGX_LOG_ERR, c->log, 0, "ngx_ssl_client_hello_ja4_cb "
                    "has a logic bug that the calculated length is not correct");
         ja->data = NULL;
     }
@@ -2012,11 +2012,6 @@ ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
     /* ja4 */
     SSL_client_hello_get0_ext(s, TLSEXT_TYPE_signature_algorithms, &sig_algos,
                               &sig_algos_len);
-    ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                    "SSL_client_hello_get_ja3_data "
-                    "sig_algos_len=%d",
-                    sig_algos_len);
-
     ja = &c->ssl->fp_ja4_data;
     ja->len = sizeof(char)                                   /* protocol */
             + sizeof(char)                                   /* sni */
@@ -2031,7 +2026,7 @@ ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
 
     ja->data = ngx_pnalloc(c->pool, ja->len);
     if (ja->data == NULL) {
-        ngx_log_error(NGX_LOG_WARN, c->log, 0, "SSL_client_hello_get_ja3_data "
+        ngx_log_error(NGX_LOG_ERR, c->log, 0, "ngx_ssl_client_hello_ja4_cb "
                 "out of memory for fp_ja4_data");
         ja->len = 0;
         goto failed;
@@ -2054,9 +2049,6 @@ ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
     ptr += sizeof(uint8_t);
 
     /* version */
-    ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                    "SSL_client_hello_get_ja3_data "
-                    "versions_len=%d", versions_len);
     if (versions_len > 0) {
         uint16_t max_version = 0;
         for (i = 0; i < versions_len; i += 2) {
@@ -2065,9 +2057,6 @@ ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
                 max_version = version;
             }
         }
-        ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                        "SSL_client_hello_get_ja3_data "
-                        "max_version=%d", max_version);
         *(uint16_t *) ptr = (uint16_t) max_version;
         ptr += sizeof(uint16_t);
     } else {
@@ -2076,26 +2065,20 @@ ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
     }
 
     /* first ALPN */
-    ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                    "SSL_client_hello_get_ja3_data "
-                    "alpn_len=%d", alpn_len);
     if (alpn_len > 0) {
         // The first two bytes are a 16bit encoding of the total length.
         if (alpn_len < 5) {
-            ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                          "SSL_client_hello_get_ja3_data "
+            ngx_log_error(NGX_LOG_ERR, c->log, 0,
+                          "ngx_ssl_client_hello_ja4_cb "
                           "too short alpn_len=%d", alpn_len);
             ja->data = NULL;
             goto failed;
         }
 
         uint8_t first_alpn_len = alpn[2];
-        ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                        "SSL_client_hello_get_ja3_data "
-                        "first_alpn_len=%d", first_alpn_len);
         if (first_alpn_len == 0 || (size_t) 3 + first_alpn_len > alpn_len) {
-            ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                          "SSL_client_hello_get_ja3_data "
+            ngx_log_error(NGX_LOG_ERR, c->log, 0,
+                          "ngx_ssl_client_hello_ja4_cb "
                           "invalid first_alpn_len=%d, alpn_len=%d",
                           first_alpn_len, alpn_len);
             ja->data = NULL;
@@ -2105,11 +2088,6 @@ ngx_ssl_client_hello_ja3_cb(SSL *s, int *al, void *arg)
         /* TODO: convert the first byte or the last byte is not alphanum */
         *ptr++ = alpn[3];
         *ptr++ = alpn[3 + first_alpn_len - 1];
-        ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                      "SSL_client_hello_get_ja3_data "
-                      "first_alpn=%d %d (%c%c)", 
-                      (uint8_t)alpn[3], (uint8_t)alpn[3 + first_alpn_len - 1],
-                      (uint8_t)alpn[3], (uint8_t)alpn[3 + first_alpn_len - 1]);
     } else {
         memcpy(ptr, "00", 2);
         ptr += 2;
@@ -2168,7 +2146,7 @@ ngx_ssl_handshake(ngx_connection_t *c)
     ngx_ssl_clear_error(c->log);
 
     (void) SSL_CTX_set_client_hello_cb(c->ssl->session_ctx,
-                                       ngx_ssl_client_hello_ja3_cb, c);
+                                       ngx_ssl_client_hello_ja4_cb, c);
 
     n = SSL_do_handshake(c->ssl->connection);
 
