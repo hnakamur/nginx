@@ -750,6 +750,145 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 
 
 static void
+nginx_worker_cgroup_limit_memory(ngx_cycle_t *cycle, ngx_int_t worker)
+{
+    ngx_core_conf_t  *ccf;
+    u_char            path[NGX_MAX_PATH], pid[NGX_INT64_LEN], *p, *dir_end;
+    ngx_err_t         err;
+    size_t            len;
+    ngx_file_t        file;
+
+    ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+
+    if (!ccf->worker_cgroup_memory_max.len
+        && !ccf->worker_cgroup_memory_swap_max.len)
+    {
+        return;
+    }
+
+    dir_end = ngx_snprintf(path, NGX_MAX_PATH,
+                     (const char *) ccf->worker_cgroup_path_format.data,
+                     worker);
+    if (dir_end - path + sizeof("/memory.swap.max") > NGX_MAX_PATH) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, 0,
+                     "worker_cgroup_path_format too long \"%s\"", path);
+        /* fatal */
+        exit(2);
+    }
+
+    if (ngx_create_dir(path, 0755) == NGX_FILE_ERROR) {
+        err = ngx_errno;
+        if (err != NGX_EEXIST) {
+            ngx_log_error(NGX_LOG_CRIT, cycle->log, err,
+                          ngx_create_dir_n " \"%s\" failed",
+                          path);
+            /* fatal */
+            exit(2);
+        }
+    }
+
+    if (ccf->worker_cgroup_memory_max.len) {
+        p = ngx_cpystrn(dir_end, (u_char *) "/memory.max",
+                        sizeof("/memory.max"));
+
+        ngx_memzero(&file, sizeof(ngx_file_t));
+        file.name.data = path;
+        file.name.len = p - path;
+        file.fd = ngx_open_file(file.name.data, NGX_FILE_RDWR,
+                                NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+        if (file.fd == NGX_INVALID_FILE) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                          ngx_open_file_n " \"%s\" failed", file.name.data);
+            /* fatal */
+            exit(2);
+        }
+
+        if (ngx_write_file(&file, ccf->worker_cgroup_memory_max.data,
+                           ccf->worker_cgroup_memory_max.len, 0) == NGX_ERROR)
+        {
+            /* fatal */
+            exit(2);
+        }
+
+        if (ngx_close_file(file.fd) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                          ngx_close_file_n " \"%s\" failed", file.name.data);
+        }
+
+        ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
+                      "written \"%*s\" to \"%s\"", 
+                      ccf->worker_cgroup_memory_max.len,
+                      ccf->worker_cgroup_memory_max.data, file.name.data);
+    }
+
+    if (ccf->worker_cgroup_memory_swap_max.len) {
+        p = ngx_cpystrn(dir_end, (u_char *) "/memory.swap.max",
+                        sizeof("/memory.swap.max"));
+
+        ngx_memzero(&file, sizeof(ngx_file_t));
+        file.name.data = path;
+        file.name.len = p - path;
+        file.fd = ngx_open_file(file.name.data, NGX_FILE_RDWR,
+                                NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+        if (file.fd == NGX_INVALID_FILE) {
+            ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                          ngx_open_file_n " \"%s\" failed", file.name.data);
+            /* fatal */
+            exit(2);
+        }
+
+        if (ngx_write_file(&file, ccf->worker_cgroup_memory_swap_max.data,
+                           ccf->worker_cgroup_memory_swap_max.len, 0)
+            == NGX_ERROR)
+        {
+            /* fatal */
+            exit(2);
+        }
+
+        if (ngx_close_file(file.fd) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                          ngx_close_file_n " \"%s\" failed", file.name.data);
+        }
+
+        ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
+                      "written \"%*s\" to \"%s\"",
+                      ccf->worker_cgroup_memory_swap_max.len,
+                      ccf->worker_cgroup_memory_swap_max.data,
+                      file.name.data);
+    }
+
+    p = ngx_cpystrn(dir_end, (u_char *) "/cgroup.procs",
+                    sizeof("/cgroup.procs"));
+
+    ngx_memzero(&file, sizeof(ngx_file_t));
+    file.name.data = path;
+    file.name.len = p - path;
+    file.fd = ngx_open_file(file.name.data, NGX_FILE_RDWR,
+                            NGX_FILE_TRUNCATE, NGX_FILE_DEFAULT_ACCESS);
+    if (file.fd == NGX_INVALID_FILE) {
+        ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
+                      ngx_open_file_n " \"%s\" failed", file.name.data);
+        /* fatal */
+        exit(2);
+    }
+
+    len = ngx_snprintf(pid, NGX_INT64_LEN, "%P", ngx_pid) - pid;
+    if (ngx_write_file(&file, pid, len, 0) == NGX_ERROR) {
+        /* fatal */
+        exit(2);
+    }
+
+    if (ngx_close_file(file.fd) == NGX_FILE_ERROR) {
+        ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                      ngx_close_file_n " \"%s\" failed", file.name.data);
+    }
+
+    ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
+                  "written \"%*s\" to \"%s\"", len, pid, file.name.data);
+}
+
+
+static void
 ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
 {
     sigset_t          set;
@@ -794,6 +933,10 @@ ngx_worker_process_init(ngx_cycle_t *cycle, ngx_int_t worker)
                           "setrlimit(RLIMIT_CORE, %O) failed",
                           ccf->rlimit_core);
         }
+    }
+
+    if (ccf->worker_cgroup_path_format.len) {
+        nginx_worker_cgroup_limit_memory(cycle, worker);
     }
 
     if (geteuid() == 0) {

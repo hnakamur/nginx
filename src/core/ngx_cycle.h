@@ -98,6 +98,9 @@ typedef struct {
 
     ngx_int_t                 rlimit_nofile;
     off_t                     rlimit_core;
+    ngx_str_t                 worker_cgroup_path_format;
+    ngx_str_t                 worker_cgroup_memory_max;
+    ngx_str_t                 worker_cgroup_memory_swap_max;
 
     int                       priority;
 
