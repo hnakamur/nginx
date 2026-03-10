@@ -2147,8 +2147,7 @@ ngx_ssl_client_hello_ja4_cb(SSL *s, int *al, void *arg)
                        sig_algos_len = 0, i;
     int                is_sni = 0;
     const u_char      *ciphers = NULL, *groups = NULL, *formats = NULL,
-                      *versions = NULL, *alpn = NULL, *sig_algos = NULL,
-                      *exts_data;
+                      *versions = NULL, *alpn = NULL, *sig_algos = NULL;
     u_char            *ptr;
     uint16_t           legacy_version, *exts = NULL, exts_len = 0;
 
@@ -2186,7 +2185,6 @@ ngx_ssl_client_hello_ja4_cb(SSL *s, int *al, void *arg)
     if (ja->data == NULL) {
         ngx_log_error(NGX_LOG_ERR, c->log, 0, "ngx_ssl_client_hello_ja4_cb "
                       "out of memory for fp_ja3_data");
-        ja->len = 0;
         goto failed;
     }
 
@@ -2202,7 +2200,7 @@ ngx_ssl_client_hello_ja4_cb(SSL *s, int *al, void *arg)
 
     /* extensions */
     ptr = append_uint16(ptr, exts_len);
-    exts = ptr;
+    exts = (uint16_t *) ptr;
     if (((uintptr_t) exts) % 2 != 0) {
         ngx_log_error(NGX_LOG_WARN, c->log, 0, "ngx_ssl_client_hello_ja4_cb "
                       "ext destination is not 2-byte aligned");
@@ -2234,7 +2232,7 @@ ngx_ssl_client_hello_ja4_cb(SSL *s, int *al, void *arg)
     if (ptr != ja->data + ja->len) {
         ngx_log_error(NGX_LOG_ERR, c->log, 0, "ngx_ssl_client_hello_ja4_cb "
                       "length mismatch for ja3");
-        ja->data = NULL;
+        goto failed;
     }
 
     /* ja4 */
@@ -2264,7 +2262,6 @@ ngx_ssl_client_hello_ja4_cb(SSL *s, int *al, void *arg)
     if (ja->data == NULL) {
         ngx_log_error(NGX_LOG_ERR, c->log, 0, "ngx_ssl_client_hello_ja4_cb "
                       "out of memory for fp_ja4_data");
-        ja->len = 0;
         goto failed;
     }
 
@@ -2316,7 +2313,6 @@ ngx_ssl_client_hello_ja4_cb(SSL *s, int *al, void *arg)
             ngx_log_error(NGX_LOG_ERR, c->log, 0,
                           "ngx_ssl_client_hello_ja4_cb "
                           "too short alpn_len=%d", alpn_len);
-            ja->data = NULL;
             goto failed;
         }
 
@@ -2326,7 +2322,6 @@ ngx_ssl_client_hello_ja4_cb(SSL *s, int *al, void *arg)
                           "ngx_ssl_client_hello_ja4_cb "
                           "invalid first_alpn_len=%d, alpn_len=%d",
                           first_alpn_len, alpn_len);
-            ja->data = NULL;
             goto failed;
         }
 
@@ -2353,12 +2348,17 @@ ngx_ssl_client_hello_ja4_cb(SSL *s, int *al, void *arg)
     if (ptr != ja->data + ja->len) {
         ngx_log_error(NGX_LOG_ERR, c->log, 0, "ngx_ssl_client_hello_ja4_cb "
                       "length mismatch for ja4");
-        ja->data = NULL;
+        goto failed;
     }
 
     ngx_log_error(NGX_LOG_NOTICE, c->log, 0, "ja4_cb exit");
 
+    return SSL_CLIENT_HELLO_SUCCESS;
+
 failed:
+    free(ja->data);
+    ja->data = NULL;
+    ja->len = 0;
     return SSL_CLIENT_HELLO_SUCCESS;
 }
 
